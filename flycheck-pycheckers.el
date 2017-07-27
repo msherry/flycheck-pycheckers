@@ -46,6 +46,10 @@
 (flycheck-def-args-var flycheck-pycheckers-args python-pycheckers
   )
 
+(flycheck-def-config-file-var flycheck-pycheckers-pylintrc python-pycheckers
+    ".pylintrc"
+  :safe #'stringp)
+
 (flycheck-def-option-var flycheck-pycheckers-checkers '(pylint mypy2 mypy3) python-pycheckers
   "The set of enabled checkers to run"
   :type '(set
@@ -86,6 +90,7 @@ per-directory."
              "-c" (eval (mapconcat #'symbol-name flycheck-pycheckers-checkers ","))
              "--max-line-length" (eval (number-to-string flycheck-pycheckers-max-line-length))
              "--multi-thread" (eval flycheck-pycheckers-multi-thread)
+             (config-file "--pylint-rcfile" flycheck-pycheckers-pylintrc)
              ;; Need `source-inplace' for relative imports (e.g. `from .foo
              ;; import bar'), see https://github.com/flycheck/flycheck/issues/280
              source-inplace)

@@ -353,8 +353,7 @@ class PylintRunner(LintRunner):
             '--disable=' + ','.join(self.ignore_codes),
             '--dummy-variables-rgx=' + '_.*',
             '--max-line-length', str(self.options.max_line_length),
-            # TODO: walk ancestor dirs looking for config file, up to $HOME
-            '--rcfile', '.pylintrc',
+            '--rcfile', self.options.pylint_rcfile,
         )
 
 
@@ -632,6 +631,8 @@ def parse_args():
                               'higher directory than this one'))
     parser.add_argument('--multi-thread', type=str2bool, default=True, action='store',
                         help='Run checkers sequentially, rather than simultaneously')
+    parser.add_argument('--pylint-rcfile', default='.pylintrc', dest='pylint_rcfile',
+                        help='Location of a config file for pylint')
     return parser.parse_args()
 
 
