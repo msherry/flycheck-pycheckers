@@ -1,3 +1,6 @@
+[![MELPA](https://melpa.org/packages/flycheck-pycheckers-badge.svg)](https://melpa.org/#/flycheck-pycheckers)
+[![MELPA](https://stable.melpa.org/packages/flycheck-pycheckers-badge.svg)](https://stable.melpa.org/#/flycheck-pycheckers)
+
 # flycheck-pycheckers
 Multiple syntax checker for Python
 
@@ -28,6 +31,11 @@ This also allows us to run multiple syntax checkers in parallel, rather than
 sequentially.
 
 ## Usage
+
+Installation via MELPA is easiest:
+```elisp
+M-x install-package flycheck-pycheckers
+```
 
 In your `init.el`:
 
