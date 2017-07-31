@@ -40,7 +40,16 @@ M-x install-package flycheck-pycheckers
 In your `init.el`:
 
 ```elisp
-(require 'flycheck-pycheckers) ; Not necessary if using ELPA package
+(require 'flycheck-pycheckers) ; Not necessary if installed via MELPA
 (with-eval-after-load 'flycheck
    (add-hook 'flycheck-mode-hook #'flycheck-pycheckers-setup))
 ```
+
+`flycheck-pycheckers` attempts to make itself the preferred Flycheck checker
+for python by adding itself to the beginning of `flycheck-checkers`, which is
+traversed in order until a valid checker is found. The error list (viewable with
+`flycheck-list-errors`, bound to `C-c ! l` by default) shows a unified view of
+all errors found by all checkers, with line and column information where
+available.
+
+![flycheck-list-errors](docs/flycheck-list-errors.png "flycheck-list-errors")
