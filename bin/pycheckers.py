@@ -11,13 +11,21 @@ http://creativecommons.org/licenses/sa/1.0/
 Later improvements by Marc Sherry <msherry@gmail.com>
 """
 
+from __future__ import absolute_import, division, print_function
+
 from argparse import ArgumentParser, ArgumentTypeError
-import ConfigParser
 from functools import partial
 import os
 import re
 from subprocess import call, Popen, PIPE
 import sys
+
+# TODO: Ignore the type of ConfigParser until
+# https://github.com/python/mypy/issues/1107 is fixed
+try:
+    from configparser import ConfigParser  # type: ignore
+except ImportError:
+    from ConfigParser import SafeConfigParser as ConfigParser  # type: ignore
 
 try:
     # pylint: disable=C0412, W0611
@@ -50,8 +58,8 @@ default_ignore_codes = [
 
     # 'E127',          # continuation line over-indented for visual indent
     # 'E128',          # continuation line under-indented for visual indent
-    # 'E711',            # comparison to None should be...
-    # 'E712',            # comparison to True/False should be ...
+    # 'E711',          # comparison to None should be...
+    # 'E712',          # comparison to True/False should be ...
 
     'C0411',           # external import "..." comes before "..."
     'C0413',           # Import "..." should be placed at the top of the module
@@ -147,7 +155,7 @@ class LintRunner(object):
         try:
             process = Popen(args, stdout=PIPE, stderr=PIPE)
         except Exception as e:                   # pylint: disable=broad-except
-            print e
+            print(e)
             return False
         exec_path, _err = process.communicate()
 
@@ -170,9 +178,9 @@ class LintRunner(object):
         args.append(filename)
 
         try:
-            process = Popen(args, stdout=PIPE, stderr=PIPE)
+            process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
         except Exception as e:                   # pylint: disable=broad-except
-            print e, args
+            print(e, args)
             return 1, [str(e)]
 
         out, err = process.communicate()
@@ -418,7 +426,7 @@ class MyPy3Runner(MyPy2Runner):
 
 def croak(*msgs):
     for m in msgs:
-        print >> sys.stderr, m.strip()
+        print(m.strip(), file=sys.stderr)
     sys.exit(1)
 
 
@@ -433,7 +441,7 @@ RUNNERS = {
 
 
 def update_options_from_file(options, config_file_path):
-    config = ConfigParser.SafeConfigParser()
+    config = ConfigParser()
     config.read(config_file_path)
 
     def _is_false(value):
@@ -537,7 +545,7 @@ def get_vcs_branch_name(source_file):
 
     dirname = os.path.dirname(source_file)
     args = commands[vcs_name]
-    p = Popen(args, stdout=PIPE, stderr=PIPE, cwd=dirname)
+    p = Popen(args, stdout=PIPE, stderr=PIPE, cwd=dirname, universal_newlines=True)
     out, _err = p.communicate()
     p.wait()
     out = out.strip()
@@ -607,9 +615,9 @@ def find_project_root(source_file):
 def parse_args():
 
     def str2bool(v):
-        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        if v.lower() in ('yes', 'true', 't', 'y', 'on', '1'):
             return True
-        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        elif v.lower() in ('no', 'false', 'f', 'n', 'off', '0'):
             return False
         else:
             raise ArgumentTypeError('Boolean value expected.')
@@ -657,7 +665,7 @@ def main():
     try:
         [RUNNERS[checker_name] for checker_name in checker_names]
     except KeyError:
-        croak(("Unknown checker %s" % checker_name),
+        croak(("Unknown checker %s" % checker_name),  # pylint: disable=used-before-assignment
               ("Expected one of %s" % ', '.join(RUNNERS.keys())))
 
     if options.multi_thread:
@@ -682,7 +690,7 @@ def main():
 
     for out_lines in out_lines_list:
         for line in out_lines:
-            print line
+            print(line)
 
     sys.exit(errors_or_warnings > 0)
 
