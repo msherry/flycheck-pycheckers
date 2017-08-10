@@ -61,8 +61,10 @@
 (flycheck-def-args-var flycheck-pycheckers-args python-pycheckers
   )
 
+;;; TODO: flycheck doesn't seem to support multiple config files -- work around
+;;; this
 (flycheck-def-config-file-var flycheck-pycheckers-pylintrc python-pycheckers
-    ".pylintrc"
+  ".pylintrc"
   :safe #'stringp)
 
 (flycheck-def-option-var flycheck-pycheckers-checkers '(pylint mypy2 mypy3) python-pycheckers
@@ -77,20 +79,25 @@
 
 (flycheck-def-option-var flycheck-pycheckers-ignore-codes '("C0411"
                                                             "C0413")
-    python-pycheckers
+  python-pycheckers
   "A list of error codes to ignore"
   :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
 
 (flycheck-def-option-var flycheck-pycheckers-max-line-length 80
-    python-pycheckers
+  python-pycheckers
   "The maximum line length allowed by the checkers."
   :type 'integer)
 
 (flycheck-def-option-var flycheck-pycheckers-multi-thread "true"
-    python-pycheckers
+  python-pycheckers
   "Whether to run multiple checkers simultaneously"
   :type '(radio (const :tag "Multi-threaded" "true")
-                 (const :tag "Single-threaded" "false")))
+          (const :tag "Single-threaded" "false")))
+
+(flycheck-def-option-var flycheck-pycheckers-venv-root "~/.virtualenvs"
+   python-pycheckers
+   "Directory containing the collection of virtual environments"
+   :type 'string)
 
 (flycheck-define-command-checker 'python-pycheckers
   "Multiple python syntax checker.
@@ -105,6 +112,7 @@ per-directory."
              "-c" (eval (mapconcat #'symbol-name flycheck-pycheckers-checkers ","))
              "--max-line-length" (eval (number-to-string flycheck-pycheckers-max-line-length))
              "--multi-thread" (eval flycheck-pycheckers-multi-thread)
+             "--venv-root" (eval flycheck-pycheckers-venv-root)
              (config-file "--pylint-rcfile" flycheck-pycheckers-pylintrc)
              ;; Need `source-inplace' for relative imports (e.g. `from .foo
              ;; import bar'), see https://github.com/flycheck/flycheck/issues/280

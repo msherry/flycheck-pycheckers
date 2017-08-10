@@ -28,7 +28,7 @@ except ImportError:
     from ConfigParser import SafeConfigParser as ConfigParser  # type: ignore
 
 try:
-    # pylint: disable=C0412, W0611
+    # pylint: disable=unused-import
     from argparse import Namespace     # noqa: F401
     from typing import (               # noqa: F401
         Dict, List, IO, Optional, Set, Tuple)
@@ -71,11 +71,12 @@ default_ignore_codes = [
 class LintRunner(object):
     """Base class provides common functionality to run python code checkers."""
 
-    output_format = ("%(level)s %(error_type)s%(error_number)s:"
-                     "%(description)s at %(filename)s line %(line_number)s.")
-    output_format_w_column = ("%(level)s %(error_type)s%(error_number)s:"
-                              "%(description)s at %(filename)s line %(line_number)s,"
-                              "%(column_number)s.")
+    out_fmt = ("%(level)s %(error_type)s%(error_number)s:"
+               "%(description)s at %(filename)s line %(line_number)s.")
+    out_fmt_w_col = (
+        "%(level)s %(error_type)s%(error_number)s:"
+        "%(description)s at %(filename)s line %(line_number)s,"
+        "%(column_number)s.")
 
     output_template = dict.fromkeys(
         ('level', 'error_type', 'error_number', 'description',
@@ -87,9 +88,8 @@ class LintRunner(object):
 
     command = ''
 
-    def __init__(self, ignore_codes=None, use_sane_defaults=True, options=None):
-        # type: (Optional[Tuple[str, ...]], bool, Namespace) -> None
-        ignore_codes = ignore_codes or ()
+    def __init__(self, ignore_codes, options, use_sane_defaults=True):
+        # type: (Tuple[str, ...], Namespace, bool) -> None
         self.ignore_codes = set(ignore_codes)
         if use_sane_defaults:
             self.ignore_codes |= self.sane_default_ignore_codes
@@ -142,8 +142,9 @@ class LintRunner(object):
                             fixed_up['description'] = '%s: %s' % (
                                 self.name, fixed_up['description'])
                         tokens.update(fixed_up)
-                        template = (self.output_format_w_column if fixed_up.get('column_number')
-                                    else self.output_format)
+                        template = (
+                            self.out_fmt_w_col if fixed_up.get('column_number')
+                            else self.out_fmt)
                         out_lines.append(template % tokens)
                         errors_or_warnings += 1
         return errors_or_warnings, out_lines
@@ -165,12 +166,13 @@ class LintRunner(object):
 
     def run(self, filename):
         # type: (str) -> Tuple[int, List[str]]
-
         if not self._executable_exists():
-            # Return a parseable error message so the normal parsing mechanism can display it
+            # Return a parseable error message so the normal parsing mechanism
+            # can display it
             return 1, [
-                'WARNING : {}:Checker not found on PATH, unable to check at {} line 1.'.format(
-                    self.command, filename)]
+                ('WARNING : {}:Checker not found on PATH, '
+                 'unable to check at {} line 1.'.format(
+                     self.command, filename))]
 
         # `env` to use a virtualenv, if found
         args = ['/usr/bin/env', self.command]
@@ -178,7 +180,8 @@ class LintRunner(object):
         args.append(filename)
 
         try:
-            process = Popen(args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            process = Popen(
+                args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
         except Exception as e:                   # pylint: disable=broad-except
             print(e, args)
             return 1, [str(e)]
@@ -212,6 +215,7 @@ class PyflakesRunner(LintRunner):
 
     @classmethod
     def fixup_data(cls, _line, data):
+        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
         if 'imported but unused' in data['description']:
             data['level'] = 'WARNING'
         elif 'redefinition of unused' in data['description']:
@@ -243,6 +247,7 @@ class Flake8Runner(LintRunner):
 
     @classmethod
     def fixup_data(cls, _line, data):
+        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
         if data['error_type'] in ['E']:
             data['level'] = 'WARNING'
         elif data['error_type'] in ['F']:
@@ -265,6 +270,7 @@ class Flake8Runner(LintRunner):
         return data
 
     def get_run_flags(self, _filename):
+        # type: (str) -> Tuple[str, ...]
         return (
             '--ignore=' + ','.join(self.ignore_codes),
             '--max-line-length', str(self.options.max_line_length),
@@ -293,10 +299,12 @@ class Pep8Runner(LintRunner):
 
     @classmethod
     def fixup_data(cls, _line, data):
+        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
         data['level'] = 'WARNING'
         return data
 
     def get_run_flags(self, _filename):
+        # type: (str) -> Tuple[str, ...]
         return (
             '--repeat',
             '--ignore=' + ','.join(self.ignore_codes),
@@ -345,6 +353,7 @@ class PylintRunner(LintRunner):
 
     @classmethod
     def fixup_data(cls, _line, data):
+        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
         if data['error_type'].startswith('E'):
             data['level'] = 'ERROR'
         else:
@@ -355,8 +364,10 @@ class PylintRunner(LintRunner):
         return data
 
     def get_run_flags(self, _filename):
+        # type: (str) -> Tuple[str, ...]
         return (
-            '--msg-template', '{path}:{line}:{column}: [{msg_id}({symbol})] {msg}',
+            '--msg-template', ('{path}:{line}:{column}: '
+                               '[{msg_id}({symbol})] {msg}'),
             '--reports', 'n',
             '--disable=' + ','.join(self.ignore_codes),
             '--dummy-variables-rgx=' + '_.*',
@@ -390,7 +401,10 @@ class MyPy2Runner(LintRunner):
         under a subdir corresponding to the branch name.
         """
         branch_top = os.path.join(
-            find_project_root(filename), '.mypy_cache', 'branches')
+            find_project_root(filename, self.options.venv_root),
+            '.mypy_cache', 'branches')
+        # TODO: it doesn't make sense to get a branch name unless we actually
+        # found a VCS root (i.e. a virtualenv match isn't enough)
         branch = get_vcs_branch_name(filename)
         if branch:
             cache_dir = os.path.join(branch_top, branch)
@@ -400,12 +414,14 @@ class MyPy2Runner(LintRunner):
         return cache_dir
 
     def get_run_flags(self, filename):
+        # type: (str) -> Tuple[str, ...]
         return (
             '--py2',
             '--cache-dir={}'.format(self._get_cache_dir(filename)),
         ) + self._base_flags
 
     def fixup_data(self, _line, data):
+        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
         data['level'] = data['level'].upper()
         if data['level'] == 'NOTE':
             return None
@@ -416,15 +432,18 @@ class MyPy3Runner(MyPy2Runner):
 
     @property
     def name(self):
+        # type: () -> str
         return 'mypy3'
 
     def get_run_flags(self, filename):
+        # type: (str) -> Tuple[str, ...]
         return (
             '--cache-dir={}'.format(self._get_cache_dir(filename)),
         ) + self._base_flags
 
 
 def croak(*msgs):
+    # type: (*str) -> None
     for m in msgs:
         print(m.strip(), file=sys.stderr)
     sys.exit(1)
@@ -441,13 +460,16 @@ RUNNERS = {
 
 
 def update_options_from_file(options, config_file_path):
+    # type: (Namespace, str) -> Namespace
     config = ConfigParser()
     config.read(config_file_path)
 
     def _is_false(value):
+        # type: (str) -> bool
         return value.lower() in {'false', 'f'}
 
     def _is_true(value):
+        # type: (str) -> bool
         return value.lower() in {'true', 't'}
 
     for key, value in config.defaults().iteritems():
@@ -500,8 +522,7 @@ def update_options_locally(options):
 def run_one_checker(ignore_codes, options, source_file, checker_name):
     # type: (Tuple[str, ...], Namespace, str, str) -> Tuple[int, List[str]]
     checker_class = RUNNERS[checker_name]
-    runner = checker_class(
-        ignore_codes=ignore_codes, options=options)
+    runner = checker_class(ignore_codes=ignore_codes, options=options)
     errors_or_warnings, out_lines = runner.run(source_file)
     return (errors_or_warnings, out_lines)
 
@@ -545,7 +566,8 @@ def get_vcs_branch_name(source_file):
 
     dirname = os.path.dirname(source_file)
     args = commands[vcs_name]
-    p = Popen(args, stdout=PIPE, stderr=PIPE, cwd=dirname, universal_newlines=True)
+    p = Popen(
+        args, stdout=PIPE, stderr=PIPE, cwd=dirname, universal_newlines=True)
     out, _err = p.communicate()
     p.wait()
     out = out.strip()
@@ -553,20 +575,17 @@ def get_vcs_branch_name(source_file):
     return out if out else None
 
 
-def find_correct_virtualenv(source_file):
-    # type: (str) -> Tuple[Optional[str], Optional[str]]
-    """Return the virtualenv that corresponds to this source file, if any, plus
-    the project root.
+def guess_virtualenv(source_file, venv_root):
+    # type: (str, str) -> Tuple[Optional[str], Optional[str]]
+    """Return the path to the virtualenv that corresponds to this source
+    file, if any, plus the project root.
 
     The virtualenv name must match the name of one of the containing
     directories.
-
     """
-    # TODO: this is very unix-specific
     full_path = os.path.abspath(source_file)
-    dir_components = os.path.dirname(full_path).split('/')
-    # TODO: this should be a setting
-    virtualenv_base = os.path.expanduser('~/.virtualenvs/')
+    dir_components = os.path.dirname(full_path).split(os.sep)
+    virtualenv_base = os.path.expanduser(venv_root)
     used_components = []
     for component in dir_components:
         if not component:
@@ -578,22 +597,22 @@ def find_correct_virtualenv(source_file):
     return None, None
 
 
-def update_env_with_virtualenv(source_file):
-    # type: (str) -> None
+def set_path_for_virtualenv(source_file, venv_root):
+    # type: (str, str) -> None
     """Determine if the current file is part of a package that has a
     virtualenv, and munge paths appropriately"""
 
-    venv_path, _project_root = find_correct_virtualenv(source_file)
+    venv_path, _project_root = guess_virtualenv(source_file, venv_root)
     if venv_path:
         bin_path = os.path.join(venv_path, 'bin')
         os.environ['PATH'] = bin_path + ':' + os.environ['PATH']
 
 
-def find_project_root(source_file):
-    # type: (str) -> str
+def find_project_root(source_file, venv_root):
+    # type: (str, str) -> str
     """Find the root of the current project.
 
-    - Based on ~/.emacs.d/plugins/jedi-local.el, look for a VCS directory.
+    - Walk up the directory tree looking for a VCS directory.
     - Failing that, find a virtualenv that matches a part of the directory.
     - Otherwise, just use the local directory.
     """
@@ -603,7 +622,7 @@ def find_project_root(source_file):
         return vcs_root
 
     # Case 2
-    _venv_root, project_dir = find_correct_virtualenv(source_file)
+    _venv_path, project_dir = guess_virtualenv(source_file, venv_root)
     if project_dir:
         return project_dir
 
@@ -613,11 +632,13 @@ def find_project_root(source_file):
 
 
 def parse_args():
+    # type: () -> Namespace
 
     def str2bool(v):
-        if v.lower() in ('yes', 'true', 't', 'y', 'on', '1'):
+        # type: (str) -> bool
+        if v.lower() in {'yes', 'true', 't', 'y', 'on', '1'}:
             return True
-        elif v.lower() in ('no', 'false', 'f', 'n', 'off', '0'):
+        elif v.lower() in {'no', 'false', 'f', 'n', 'off', '0'}:
             return False
         else:
             raise ArgumentTypeError('Boolean value expected.')
@@ -627,7 +648,7 @@ def parse_args():
     parser.add_argument("-c", "--checkers", dest="checkers",
                         default=default_checkers,
                         help="Comma-separated list of checkers")
-    parser.add_argument("-i", "--ignore_codes", dest="ignore_codes",
+    parser.add_argument("-i", "--ignore-codes", dest="ignore_codes",
                         default=','.join(default_ignore_codes),
                         help="Comma-separated list of error codes to ignore")
     parser.add_argument('--max-line-length', dest='max_line_length',
@@ -637,9 +658,15 @@ def parse_args():
                         action='store_false',
                         help=('Whether to ignore config files found at a '
                               'higher directory than this one'))
-    parser.add_argument('--multi-thread', type=str2bool, default=True, action='store',
-                        help='Run checkers sequentially, rather than simultaneously')
-    parser.add_argument('--pylint-rcfile', default='.pylintrc', dest='pylint_rcfile',
+    parser.add_argument('--multi-thread', type=str2bool, default=True,
+                        action='store',
+                        help=('Run checkers sequentially, '
+                              'rather than simultaneously'))
+    parser.add_argument('--venv-root', dest='venv_root',
+                        default='~/.virtualenvs', action='store',
+                        help='Location of Python virtual environments')
+    parser.add_argument('--pylint-rcfile', default='.pylintrc',
+                        dest='pylint_rcfile',
                         help='Location of a config file for pylint')
     return parser.parse_args()
 
@@ -659,7 +686,7 @@ def main():
     ignore_codes = tuple(options.ignore_codes.split(","))
 
     options = update_options_locally(options)
-    update_env_with_virtualenv(source_file)
+    set_path_for_virtualenv(source_file, options.venv_root)
 
     checker_names = [checker.strip() for checker in checkers.split(',')]
     try:
