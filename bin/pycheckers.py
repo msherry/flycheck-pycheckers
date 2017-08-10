@@ -28,7 +28,7 @@ except ImportError:
     from ConfigParser import SafeConfigParser as ConfigParser  # type: ignore
 
 try:
-    # pylint: disable=unused-import
+    # pylint: disable=unused-import, ungrouped-imports
     from argparse import Namespace     # noqa: F401
     from typing import (               # noqa: F401
         Dict, List, IO, Optional, Set, Tuple)
@@ -400,12 +400,13 @@ class MyPy2Runner(LintRunner):
         We attempt to place the cache directory in the project root,
         under a subdir corresponding to the branch name.
         """
-        branch_top = os.path.join(
-            find_project_root(filename, self.options.venv_root),
-            '.mypy_cache', 'branches')
-        # TODO: it doesn't make sense to get a branch name unless we actually
-        # found a VCS root (i.e. a virtualenv match isn't enough)
-        branch = get_vcs_branch_name(filename)
+        project_root = find_project_root(filename, self.options.venv_root)
+        branch_top = os.path.join(project_root, '.mypy_cache', 'branches')
+        # It doesn't make sense to get a branch name unless we actually found a
+        # VCS root (i.e. a virtualenv match isn't enough)
+        branch = ''                       # type: Optional[str]
+        if find_vcs_name(project_root):
+            branch = get_vcs_branch_name(project_root)
         if branch:
             cache_dir = os.path.join(branch_top, branch)
         else:
@@ -527,20 +528,22 @@ def run_one_checker(ignore_codes, options, source_file, checker_name):
     return (errors_or_warnings, out_lines)
 
 
+def find_vcs_name(dir_):
+    # type: (str) -> Optional[str]
+    """If dir_ is a VCS root, return the name of the VCS, otherwise None"""
+    for part in ['.git', '.svn', '.hg', '.cvs', '.jedi']:
+        path = os.path.join(dir_, part)
+        if os.path.exists(path) and os.path.isdir(path):
+            return part[1:]             # return the name of the vcs system
+    return None
+
+
 def find_vcs_root(source_file):
     # type: (str) -> Tuple[Optional[str], Optional[str]]
-
-    def _is_vcs_root(dir_):
-        # type: (str) -> str
-        for part in ['.git', '.svn', '.hg', '.cvs', '.jedi']:
-            path = os.path.join(dir_, part)
-            if os.path.exists(path) and os.path.isdir(path):
-                return part[1:]             # return the name of the vcs system
-        return ''
-
+    """Returns the path to the root and the name of the VCS system, if found"""
     cur_dir = os.path.dirname(source_file)
     while True:
-        vcs_name = _is_vcs_root(cur_dir)
+        vcs_name = find_vcs_name(cur_dir)
         if vcs_name:
             return cur_dir, vcs_name
         parent = os.path.dirname(cur_dir)
@@ -550,24 +553,22 @@ def find_vcs_root(source_file):
     return None, None
 
 
-def get_vcs_branch_name(source_file):
+def get_vcs_branch_name(vcs_root):
     # type: (str) -> Optional[str]
     """If under source control and the VCS supports branches, find branch name.
     """
     # TODO: only supports git for now
-
     commands = {
         'git': ['git', 'symbolic-ref', '--short', 'HEAD'],
     }
-    _vcs_root, vcs_name = find_vcs_root(source_file)
+    vcs_name = find_vcs_name(vcs_root)
     if not vcs_name or vcs_name not in commands:
         # Unsupported VCS
         return None
 
-    dirname = os.path.dirname(source_file)
     args = commands[vcs_name]
     p = Popen(
-        args, stdout=PIPE, stderr=PIPE, cwd=dirname, universal_newlines=True)
+        args, stdout=PIPE, stderr=PIPE, cwd=vcs_root, universal_newlines=True)
     out, _err = p.communicate()
     p.wait()
     out = out.strip()
@@ -577,8 +578,8 @@ def get_vcs_branch_name(source_file):
 
 def guess_virtualenv(source_file, venv_root):
     # type: (str, str) -> Tuple[Optional[str], Optional[str]]
-    """Return the path to the virtualenv that corresponds to this source
-    file, if any, plus the project root.
+    """Return the paths to the project root and the virtualenv that
+    corresponds to this source file, if any.
 
     The virtualenv name must match the name of one of the containing
     directories.
@@ -586,14 +587,14 @@ def guess_virtualenv(source_file, venv_root):
     full_path = os.path.abspath(source_file)
     dir_components = os.path.dirname(full_path).split(os.sep)
     virtualenv_base = os.path.expanduser(venv_root)
-    used_components = []
+    used_components = [os.sep]
     for component in dir_components:
         if not component:
             continue
         used_components.append(component)
         virtualenv_path = os.path.join(virtualenv_base, component)
         if os.path.exists(virtualenv_path):
-            return virtualenv_path, os.path.join(*used_components)
+            return os.path.join(*used_components), virtualenv_path
     return None, None
 
 
@@ -602,7 +603,7 @@ def set_path_for_virtualenv(source_file, venv_root):
     """Determine if the current file is part of a package that has a
     virtualenv, and munge paths appropriately"""
 
-    venv_path, _project_root = guess_virtualenv(source_file, venv_root)
+    _project_root, venv_path = guess_virtualenv(source_file, venv_root)
     if venv_path:
         bin_path = os.path.join(venv_path, 'bin')
         os.environ['PATH'] = bin_path + ':' + os.environ['PATH']
@@ -610,10 +611,11 @@ def set_path_for_virtualenv(source_file, venv_root):
 
 def find_project_root(source_file, venv_root):
     # type: (str, str) -> str
-    """Find the root of the current project.
+    """Find the root directory of the current project.
 
     - Walk up the directory tree looking for a VCS directory.
-    - Failing that, find a virtualenv that matches a part of the directory.
+    - Failing that, find a virtualenv that matches a part of the
+          directory, and choose that as the root.
     - Otherwise, just use the local directory.
     """
     # Case 1
@@ -622,7 +624,7 @@ def find_project_root(source_file, venv_root):
         return vcs_root
 
     # Case 2
-    _venv_path, project_dir = guess_virtualenv(source_file, venv_root)
+    project_dir, _venv_path = guess_virtualenv(source_file, venv_root)
     if project_dir:
         return project_dir
 
