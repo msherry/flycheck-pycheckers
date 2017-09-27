@@ -386,12 +386,12 @@ class MyPy2Runner(LintRunner):
         r' (?P<level>[^:]+):'
         r' (?P<description>.+)$')
 
-    _base_flags = (
+    _base_flags = [
         '--incremental',
         '--quick-and-dirty',
         '--ignore-missing-imports',
         '--strict-optional',
-    )
+    ]
 
     def _get_cache_dir(self, filename):
         # type: (str) -> str
@@ -416,10 +416,13 @@ class MyPy2Runner(LintRunner):
 
     def get_run_flags(self, filename):
         # type: (str) -> Tuple[str, ...]
-        return (
+        flags = [
             '--py2',
             '--cache-dir={}'.format(self._get_cache_dir(filename)),
-        ) + self._base_flags
+        ] + self._base_flags
+        if getattr(self.options, 'mypy_config_file', None):
+            flags += ['--config-file', self.options.mypy_config_file]
+        return tuple(flags)
 
     def fixup_data(self, _line, data):
         # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
@@ -438,9 +441,12 @@ class MyPy3Runner(MyPy2Runner):
 
     def get_run_flags(self, filename):
         # type: (str) -> Tuple[str, ...]
-        return (
+        flags = [
             '--cache-dir={}'.format(self._get_cache_dir(filename)),
-        ) + self._base_flags
+        ] + self._base_flags
+        if getattr(self.options, 'mypy_config_file', None):
+            flags += ['--config-file', self.options.mypy_config_file]
+        return tuple(flags)
 
 
 def croak(*msgs):
@@ -478,8 +484,16 @@ def update_options_from_file(options, config_file_path):
             value = False
         elif _is_true(value):
             value = True
+        # Special case config files to contain the full path - assume the
+        # specified path is absolute, or relative to the current .pycheckers
+        # file
+        if 'config_file' in key:
+            if not os.path.isabs(value):
+                value = os.path.join(os.path.dirname(config_file_path), value)
         setattr(options, key, value)
     for section_name in config.sections():
+        # Does this heading match the current file?
+        # TODO: does this format make sense? Would we rather have sections like 'mypy'?
         if (re.search(section_name, options.file) or
                 re.search(section_name, options.file.replace('_flymake', ''))):
             for key, value in config.items(section_name):
@@ -670,6 +684,10 @@ def parse_args():
     parser.add_argument('--pylint-rcfile', default='.pylintrc',
                         dest='pylint_rcfile',
                         help='Location of a config file for pylint')
+    parser.add_argument('--mypy-config-file', default=None,
+                        dest='mypy_config_file',
+                        help='Location of a config file for mypy')
+
     return parser.parse_args()
 
 
