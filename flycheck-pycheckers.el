@@ -2,7 +2,7 @@
 
 ;; Copyright Marc Sherry <msherry@gmail.com>
 ;; Homepage: https://github.com/msherry/flycheck-pycheckers
-;; Version: 0.2
+;; Version: 0.3
 ;; Package-Requires: ((flycheck "0.18"))
 ;; Keywords: convenience, tools, languages
 
@@ -64,6 +64,42 @@
 ;; (viewable with `flycheck-list-errors', bound to `C-c ! l' by default) shows
 ;; a unified view of all errors found by all checkers, with line and column
 ;; information where available.
+;;
+;; Configuration:
+;;
+;; There are a number of options that can be customized via
+;; `customize-variable', which all start with `flycheck-pycheckers-`.  These
+;; include:
+;;
+;; * `flycheck-pycheckers-args' - general arguments to pass to `pycheckers.py'.
+;;
+;; * `flycheck-pycheckers-checkers' - the set of checkers to run (pylint, pep8,
+;;    mypy, etc.).
+;;
+;; * `flycheck-pycheckers-ignore-codes' - a set of error codes to universally
+;;   ignore.  These can be set more granularly (e.g. per-project) using the
+;;   `.pycheckers' file described below.
+;;
+;; * `flycheck-pycheckers-max-line-length' - the default maximum line
+;;   length.  Can be overridden via `.pycheckers' file.
+;;
+;; * `flycheck-pycheckers-multi-thread' - whether to run each checker
+;;   simultaneously in its own thread, for performance.
+;;
+;; * `flycheck-pycheckers-venv-root' - a directory containing Python virtual
+;;   environments, so that imports may be found.
+;;
+;; Additionally, a `.pycheckers' file may be created in a directory to control
+;; options for every file under this directory.  These files may be logically
+;; combined, so a project may have one set of options that may be selectively
+;; overridden in a specific subdirectory.
+;;
+;;
+;; Example .pycheckers file:
+;;
+;;     [DEFAULT]
+;;     max_line_length = 120
+;;     mypy_config_file = ci/mypy.ini
 ;;
 
 ;;; Code:
