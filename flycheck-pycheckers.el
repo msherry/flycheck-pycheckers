@@ -2,7 +2,7 @@
 
 ;; Copyright Marc Sherry <msherry@gmail.com>
 ;; Homepage: https://github.com/msherry/flycheck-pycheckers
-;; Version: 0.3
+;; Version: 0.4
 ;; Package-Requires: ((flycheck "0.18"))
 ;; Keywords: convenience, tools, languages
 
@@ -74,7 +74,8 @@
 ;; * `flycheck-pycheckers-args' - general arguments to pass to `pycheckers.py'.
 ;;
 ;; * `flycheck-pycheckers-checkers' - the set of checkers to run (pylint, pep8,
-;;    mypy, etc.).
+;;    mypy, etc.).  Can be set in `.pycheckers' files with the variable
+;;    `checkers' as a comma-separated list of checker names.
 ;;
 ;; * `flycheck-pycheckers-ignore-codes' - a set of error codes to universally
 ;;   ignore.  These can be set more granularly (e.g. per-project) using the
@@ -94,13 +95,45 @@
 ;; combined, so a project may have one set of options that may be selectively
 ;; overridden in a specific subdirectory.
 ;;
-;;
 ;; Example .pycheckers file:
 ;;
 ;;     [DEFAULT]
 ;;     max_line_length = 120
 ;;     mypy_config_file = ci/mypy.ini
 ;;
+;; Variables that can be set in the configuration file include the following.
+;; Note that these are implemented as modifying the values received by
+;; `argparse' in the `pycheckers.py' script, so running `bin/pycheckers.py
+;; --help` is a good way to find other options that may be specified.:
+;;
+;; * `max-line-length' - the maximum allowable line-length.  This is a good
+;;   option to place in a project-specific directory if you have a personal
+;;   line length preference set by default via
+;;   `flycheck-pycheckers-max-line-length', but also work on projects that
+;;   follow different standards.
+;;
+;; * `checkers' - a comma-separated list of checkers to be run for files under
+;;   this directory.  If, for instance, pep8 should not be run on a directory of
+;;   auto-generated code, this option can accomplish that.
+;;
+;; * `ignore_codes' - a comma-separated list of error/warning codes to ignore
+;;   for files under this directory.  Replaces the current set of codes
+;;   completely.
+;;
+;; * `merge_configs' - whether to keep traversing upwards when parsing
+;;   `.pycheckers' files, or stop at this one.
+;;
+;; * `extra_ignore_codes' - a comma-separated list of error/warning codes to
+;;   add to the current set of ignored errors.  This can be used to make
+;;   certain directories conform to different levels of syntax enforcement.
+;;   For example, a directory containing auto-generated code may omit various
+;;   warnings about indentation or code style.
+;;
+;; * `pylint_rcfile' - the location of a project-specific configuration file
+;;   for pylint
+;;
+;; * `mypy_config_file' - the location of a project-specific configuration file
+;;   for mypy
 
 ;;; Code:
 (require 'flycheck)
