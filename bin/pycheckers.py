@@ -29,11 +29,13 @@ except ImportError:
 
 try:
     # pylint: disable=unused-import, ungrouped-imports
-    from argparse import Namespace     # noqa: F401
-    from typing import (               # noqa: F401
-        Dict, List, IO, Optional, Set, Tuple)
+    from argparse import Namespace
+    from typing import (
+        Any, Dict, List, IO, Optional, Set, Tuple)
 except ImportError:
     pass
+
+CONFIG_FILE_NAME = '.pycheckers'
 
 # Customization #
 
@@ -66,6 +68,43 @@ default_ignore_codes = [
 ]
 
 # End of customization #
+
+
+class FatalException(Exception):
+    def __init__(self, msg, filename):
+        self.msg = msg
+        self.filename = filename
+        super(FatalException, self).__init__()
+
+    def __str__(self):
+        return 'ERROR :pycheckers:{msg} at {filename} line 1.'.format(
+            msg=self.msg, filename=self.filename)
+
+
+def is_true(v):
+    # type: (str) -> bool
+    return v.lower() in {'yes', 'true', 't', 'y', 'on', '1'}
+
+
+def is_false(v):
+    # type: (str) -> bool
+    return v.lower() in {'no', 'false', 'f', 'n', 'off', '0'}
+
+
+def str2bool(v):
+    # type: (str) -> bool
+    if is_true(v):
+        return True
+    elif is_false(v):
+        return False
+    raise ArgumentTypeError('Boolean value expected.')
+
+
+def croak(msgs, filename=None):
+    # type: (Tuple[str], Optional[str]) -> None
+    for m in msgs:
+        print('ERROR :pycheckers:{} at {} line 1.'.format(m.strip(), filename), file=sys.stderr)
+    sys.exit(1)
 
 
 class LintRunner(object):
@@ -176,10 +215,9 @@ class LintRunner(object):
 
         # `env` to use a virtualenv, if found
         args = ['/usr/bin/env', self.command]
-        args.extend(self.get_run_flags(filename))
-        args.append(filename)
-
         try:
+            args.extend(self.get_run_flags(filename))
+            args.append(filename)
             process = Popen(
                 args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
         except Exception as e:                   # pylint: disable=broad-except
@@ -410,18 +448,25 @@ class MyPy2Runner(LintRunner):
         if branch:
             cache_dir = os.path.join(branch_top, branch)
         else:
-            # ERROR: can't figure out current branch
+            # Can't figure out current branch, just fake it
             cache_dir = os.path.join(branch_top, 'HEAD')
         return cache_dir
 
     def get_run_flags(self, filename):
         # type: (str) -> Tuple[str, ...]
+        """Determine which mypy (2 or 3) to run, find the cache dir and config file"""
         flags = [
-            '--py2',
             '--cache-dir={}'.format(self._get_cache_dir(filename)),
         ] + self._base_flags
         if getattr(self.options, 'mypy_config_file', None):
+            if not os.path.exists(self.options.mypy_config_file):
+                raise FatalException(
+                    "Can't find mypy config file %s" % self.options.mypy_config_file,
+                    filename)
             flags += ['--config-file', self.options.mypy_config_file]
+        if self.name == 'mypy':
+            # mypy2 mode
+            flags += ['--py2']
         return tuple(flags)
 
     def fixup_data(self, _line, data):
@@ -439,22 +484,6 @@ class MyPy3Runner(MyPy2Runner):
         # type: () -> str
         return 'mypy3'
 
-    def get_run_flags(self, filename):
-        # type: (str) -> Tuple[str, ...]
-        flags = [
-            '--cache-dir={}'.format(self._get_cache_dir(filename)),
-        ] + self._base_flags
-        if getattr(self.options, 'mypy_config_file', None):
-            flags += ['--config-file', self.options.mypy_config_file]
-        return tuple(flags)
-
-
-def croak(*msgs):
-    # type: (*str) -> None
-    for m in msgs:
-        print(m.strip(), file=sys.stderr)
-    sys.exit(1)
-
 
 RUNNERS = {
     'pyflakes': PyflakesRunner,
@@ -466,71 +495,71 @@ RUNNERS = {
 }
 
 
-def update_options_from_file(options, config_file_path):
-    # type: (Namespace, str) -> Namespace
+def get_options_from_file(file_path):
+    # type: (str) -> Dict[str, Any]
+    """Parse options from the config file at `file_path` and return them as a dict"""
+    parsed_options = {}         # type: Dict[str, Any]
+
     config = ConfigParser()
-    config.read(config_file_path)
-
-    def _is_false(value):
-        # type: (str) -> bool
-        return value.lower() in {'false', 'f'}
-
-    def _is_true(value):
-        # type: (str) -> bool
-        return value.lower() in {'true', 't'}
-
+    config.read(file_path)
+    # [DEFAULT] section
     for key, value in config.defaults().iteritems():
-        if _is_false(value):
+        if is_false(value):
             value = False
-        elif _is_true(value):
+        elif is_true(value):
             value = True
-        # Special case config files to contain the full path - assume the
-        # specified path is absolute, or relative to the current .pycheckers
-        # file
-        if 'config_file' in key:
-            if not os.path.isabs(value):
-                value = os.path.join(os.path.dirname(config_file_path), value)
-        setattr(options, key, value)
-    for section_name in config.sections():
-        # Does this heading match the current file?
-        # TODO: does this format make sense? Would we rather have sections like 'mypy'?
-        if (re.search(section_name, options.file) or
-                re.search(section_name, options.file.replace('_flymake', ''))):
-            for key, value in config.items(section_name):
-                if _is_false(value):
-                    value = False
-                elif _is_true(value):
-                    value = True
-                setattr(options, key, value)
-    if hasattr(options, 'extra_ignore_codes'):
-        extra_ignore_codes = (
-            options.extra_ignore_codes.replace(',', ' ').split())
-        # Allow for extending, rather than replacing, ignore codes
-        options.ignore_codes.extend(extra_ignore_codes)
-    return options
+        parsed_options[key] = value
+    # NOTE: removed support for per-file config file sections, as I don't think
+    # they were being used.
+    return parsed_options
 
 
 def update_options_locally(options):
     # type: (Namespace) -> Namespace
-    """
+    """Merge options from files.
+
     Traverse the project directory until a config file is found or the
     filesystem root is reached. If found, use overrides from config as
     project-specific settings.
     """
+    allowed_duplicate_options = {'extra_ignore_codes'}
+    set_options = set()         # type: Set[str]
+
     dir_path = os.path.dirname(os.path.abspath(options.file))
-    config_file_path = os.path.join(dir_path, '.pycheckers')
+    config_file_path = os.path.join(dir_path, CONFIG_FILE_NAME)
     while True:
         if os.path.exists(config_file_path):
-            options = update_options_from_file(options, config_file_path)
+            new_options = get_options_from_file(config_file_path)
+            for key, value in new_options.items():
+                if key in set_options and key not in allowed_duplicate_options:
+                    # Already set this option from a file, don't set it again
+                    continue
+                set_options.add(key)
+                # Special handling for some keys
+
+                # Special case config files to contain the full path - assume
+                # the specified path is absolute, or relative to the current
+                # .pycheckers file
+                if 'config_file' in key:
+                    if not os.path.isabs(value):
+                        value = os.path.join(os.path.dirname(config_file_path), value)
+                # Allow for extending, rather than replacing, ignore codes
+                elif key == 'extra_ignore_codes':
+                    # Still a comma-separated str
+                    value = ','.join([options.ignore_codes, value])
+                    key = 'ignore_codes'
+                setattr(options, key, value)
+
             if not options.merge_configs:
-                # We found a file and parsed it, now we're done
+                # We don't want to walk further up looking for config files
                 break
+
+        # Walk up a directory and try again for another file
         parent = os.path.dirname(dir_path)
         if parent == dir_path:
             break
         dir_path = parent
-        config_file_path = os.path.join(dir_path, '.pycheckers')
-
+        config_file_path = os.path.join(dir_path, CONFIG_FILE_NAME)
     return options
 
 
@@ -586,7 +615,6 @@ def get_vcs_branch_name(vcs_root):
     out, _err = p.communicate()
     p.wait()
     out = out.strip()
-
     return out if out else None
 
 
@@ -627,10 +655,10 @@ def find_project_root(source_file, venv_root):
     # type: (str, str) -> str
     """Find the root directory of the current project.
 
-    - Walk up the directory tree looking for a VCS directory.
-    - Failing that, find a virtualenv that matches a part of the
-          directory, and choose that as the root.
-    - Otherwise, just use the local directory.
+    1. Walk up the directory tree looking for a VCS directory.
+    2. Failing that, find a virtualenv that matches a part of the
+           directory, and choose that as the root.
+    3. Otherwise, just use the local directory.
     """
     # Case 1
     vcs_root, _vcs_name = find_vcs_root(source_file)
@@ -642,22 +670,12 @@ def find_project_root(source_file, venv_root):
     if project_dir:
         return project_dir
 
-    # Case 3 - couldn't find a project directory, just use the source_file's
-    # parent
+    # Case 3
     return os.path.dirname(source_file)
 
 
 def parse_args():
     # type: () -> Namespace
-
-    def str2bool(v):
-        # type: (str) -> bool
-        if v.lower() in {'yes', 'true', 't', 'y', 'on', '1'}:
-            return True
-        elif v.lower() in {'no', 'false', 'f', 'n', 'off', '0'}:
-            return False
-        else:
-            raise ArgumentTypeError('Boolean value expected.')
 
     parser = ArgumentParser()
     parser.add_argument('file', type=str, help='Filename to check')
@@ -702,22 +720,26 @@ def main():
     options = parse_args()
 
     source_file = options.file
-    checkers = options.checkers
-    ignore_codes = tuple(options.ignore_codes.split(","))
+    if not os.path.exists(source_file):
+        raise RuntimeError("Can't find source file %s" % source_file)
 
     options = update_options_locally(options)
+
+    checkers = options.checkers
+    ignore_codes = tuple(c for c in options.ignore_codes.split(",") if c)
     set_path_for_virtualenv(source_file, options.venv_root)
 
     checker_names = [checker.strip() for checker in checkers.split(',')]
     try:
         [RUNNERS[checker_name] for checker_name in checker_names]
     except KeyError:
-        croak(("Unknown checker %s" % checker_name),  # pylint: disable=used-before-assignment
-              ("Expected one of %s" % ', '.join(RUNNERS.keys())))
+        croak(("Unknown checker {}".format(checker_name),  # pylint: disable=used-before-assignment
+               "Expected one of %s" % ', '.join(RUNNERS.keys())),
+              filename=options.file)
 
     if options.multi_thread:
-        from multiprocessing import Pool
-        p = Pool(5)
+        from multiprocessing import Pool, cpu_count
+        p = Pool(cpu_count() + 1)
 
         func = partial(run_one_checker, ignore_codes, options, source_file)
 
