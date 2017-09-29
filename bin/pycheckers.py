@@ -463,6 +463,9 @@ class MyPy2Runner(LintRunner):
                 raise FatalException(
                     "Can't find mypy config file %s" % self.options.mypy_config_file,
                     filename)
+            # TODO: mypy won't respect per-file config options because our
+            # files are named flycheck_<real_file_name>.py at the time of
+            # check. We may have to submit a PR on mypy.
             flags += ['--config-file', self.options.mypy_config_file]
         if self.name == 'mypy':
             # mypy2 mode
