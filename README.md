@@ -2,23 +2,24 @@
 [![MELPA](https://stable.melpa.org/packages/flycheck-pycheckers-badge.svg)](https://stable.melpa.org/#/flycheck-pycheckers)
 
 # flycheck-pycheckers
-Multiple syntax checker for Python
+Multiple syntax checker for Python in Emacs, using
+[Flycheck](http://www.flycheck.org)
 
 Copyright Marc Sherry <msherry@gmail.com>
 
 This package provides a way to run multiple syntax checkers on Python code,
 in parallel.  The list of supported checkers includes:
 
-- pylint
-- flake8
-- pep8
-- pyflakes
-- mypy (for both Python 2 and 3)
+- [pylint](https://www.pylint.org/)
+- [flake8](http://flake8.pycqa.org/)
+- [pep8](https://www.python.org/dev/peps/pep-0008/)
+- [pyflakes](https://github.com/PyCQA/pyflakes)
+- [mypy](http://mypy-lang.org/) (for both Python 2 and 3)
 
 This is an alternative way of running multiple Python syntax checkers in
-flycheck that doesn't depend on flycheck's chaining mechanism.
+Flycheck that doesn't depend on Flycheck's chaining mechanism.
 
-flycheck is [opinionated](https://github.com/flycheck/flycheck/issues/185)
+Flycheck is [opinionated](https://github.com/flycheck/flycheck/issues/185)
 about what checkers should be run, and chaining is difficult to get right
 (e.g. see https://github.com/flycheck/flycheck/issues/836).  This package
 assumes that the user knows what they want, and can configure their checkers
@@ -27,7 +28,7 @@ accordingly -- if they want to run both flake8 and pylint, that's fine.
 This also allows us to run multiple syntax checkers in parallel, rather than
 sequentially.
 
-### Usage
+## Quick start
 
 Installation via MELPA is easiest:
 
@@ -35,24 +36,45 @@ Installation via MELPA is easiest:
 M-x install-package flycheck-pycheckers
 ```
 
-In your `init.el`:
+Then, in your `init.el`:
 
 ```elisp
-(require 'flycheck-pycheckers) ; Not necessary if installed via MELPA
+(global-flycheck-mode 1)
 (with-eval-after-load 'flycheck
-   (add-hook 'flycheck-mode-hook #'flycheck-pycheckers-setup))
+  (add-hook 'flycheck-mode-hook #'flycheck-pycheckers-setup))
 ```
 
-`flycheck-pycheckers` attempts to make itself the preferred Flycheck checker
-for python by adding itself to the beginning of `flycheck-checkers`, which
-is traversed in order until a valid checker is found.  The error list
+Start editing a Python file!
+
+For more details on using Flycheck in general, please see
+http://www.flycheck.org/en/latest/user/quickstart.html.  The error list
 (viewable with `flycheck-list-errors`, bound to <kbd>C-c ! l</kbd> by default) shows
 a unified view of all errors found by all checkers, with line and column
 information where available.
 
 ![flycheck-list-errors](docs/flycheck-list-errors.png "flycheck-list-errors")
 
-### Configuration
+flycheck-pycheckers can run over any Python file right away, without needing to
+set up virtual environments or driver scripts.  You will simply need to ensure
+that the checkers you want to run (pep8, mypy, flake8, etc.) are installed
+somewhere on your PATH where Emacs can find them.
+
+![flycheck-example-movie](docs/flycheck-example-movie.gif "flycheck-example-movie")
+
+## Alternatives:
+
+* [Other Flycheck-based
+  checkers](http://www.flycheck.org/en/latest/languages.html#python) -- Some
+  are officially part of the Flycheck package, and some (like this one) are
+  external plugins.
+* [Flymake](https://www.emacswiki.org/emacs/FlyMake) -- Flymake is an older
+  syntax-checking minor mode for Emacs, and is generally less supported and
+  featureful than Flycheck.
+
+## Configuration options
+
+_You can use this package without needing to get into these details at first
+-- they are intended for power users and those needing more customization._
 
 There are a number of options that can be customized via
 `customize-variable`, which all start with `flycheck-pycheckers-`.  These
@@ -77,7 +99,7 @@ options for every file under this directory.  These files may be logically
 combined, so a project may have one set of options that may be selectively
 overridden in a specific subdirectory.
 
-#### Example .pycheckers file:
+### Example .pycheckers file:
 
     [DEFAULT]
     max_line_length = 120

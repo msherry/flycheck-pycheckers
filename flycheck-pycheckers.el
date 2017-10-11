@@ -1,4 +1,4 @@
-;;; flycheck-pycheckers.el --- multiple syntax checker for Python
+;;; flycheck-pycheckers.el --- multiple syntax checker for Python, using Flycheck
 
 ;; Copyright Marc Sherry <msherry@gmail.com>
 ;; Homepage: https://github.com/msherry/flycheck-pycheckers
@@ -19,7 +19,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 ;; Copyright Marc Sherry <msherry@gmail.com>
@@ -34,9 +34,9 @@
 ;; - mypy (for both Python 2 and 3)
 ;;
 ;; This is an alternative way of running multiple Python syntax checkers in
-;; flycheck that doesn't depend on flycheck's chaining mechanism.
+;; Flycheck that doesn't depend on Flycheck's chaining mechanism.
 
-;; flycheck is opinionated about what checkers should be run (see
+;; Flycheck is opinionated about what checkers should be run (see
 ;; https://github.com/flycheck/flycheck/issues/185), and chaining is difficult
 ;; to get right (e.g. see https://github.com/flycheck/flycheck/issues/836).
 ;; This package assumes that the user knows what they want, and can configure
@@ -46,26 +46,46 @@
 ;; This also allows us to run multiple syntax checkers in parallel, rather than
 ;; sequentially.
 ;;
-;; Usage:
+;; Quick start:
 ;;
 ;; Installation via MELPA is easiest:
 ;;
 ;;     M-x install-package flycheck-pycheckers
 ;;
-;; In your `init.el':
+;; Then, in your `init.el':
 ;;
-;; (require 'flycheck-pycheckers) ; Not necessary if installed via MELPA
+;; (global-flycheck-mode 1)
 ;; (with-eval-after-load 'flycheck
 ;;   (add-hook 'flycheck-mode-hook #'flycheck-pycheckers-setup))
 ;;
-;; `flycheck-pycheckers' attempts to make itself the preferred Flycheck checker
-;; for python by adding itself to the beginning of `flycheck-checkers', which
-;; is traversed in order until a valid checker is found.  The error list
+;; Start editing a Python file!
+;;
+;; For more details on using Flycheck in general, please see
+;; http://www.flycheck.org/en/latest/user/quickstart.html.  The error list
 ;; (viewable with `flycheck-list-errors', bound to `C-c ! l' by default) shows
 ;; a unified view of all errors found by all checkers, with line and column
 ;; information where available.
 ;;
-;; Configuration:
+;; flycheck-pycheckers can run over any Python file right away, without needing
+;; to set up virtual environments or driver scripts.  You will simply need to
+;; ensure that the checkers you want to run (pep8, mypy, flake8, etc.) are
+;; installed somewhere on your PATH where Emacs can find them.
+;;
+;; Alternatives:
+;;
+;; * Other Flycheck-based checkers -
+;;   http://www.flycheck.org/en/latest/languages.html#python.  Some are
+;;   officially part of the Flycheck package, and some (like this one) are
+;;   external plugins.
+;;
+;; * Flymake - https://www.emacswiki.org/emacs/FlyMake.  Flymake is an older
+;;   syntax-checking minor mode for Emacs, and is generally less supported and
+;;   featureful than Flycheck.
+;;
+;; Configuration options:
+;;
+;; _You can use this package without needing to get into these details at first
+;; -- they are intended for power users and those needing more customization._
 ;;
 ;; There are a number of options that can be customized via
 ;; `customize-variable', which all start with `flycheck-pycheckers-`.  These
