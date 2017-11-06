@@ -102,7 +102,7 @@ class LintRunner(object):
     command = ''
 
     def __init__(self, ignore_codes, options):
-        # type: (Tuple[str, ...], Namespace, bool) -> None
+        # type: (Tuple[str, ...], Namespace) -> None
         self.ignore_codes = set(ignore_codes)
         self.options = options
 
