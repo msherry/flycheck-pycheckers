@@ -181,8 +181,9 @@
           (const :tag "mypy 2" mypy2)
           (const :tag "mypy 3" mypy3)))
 
-(flycheck-def-option-var flycheck-pycheckers-ignore-codes '("C0411"
-                                                            "C0413")
+(flycheck-def-option-var flycheck-pycheckers-ignore-codes
+    '("C0411" "C0413" "C0103" "C0111" "W0142" "W0201" "W0232" "W0403" "W0511"
+      "E1002" "E1101" "E1103" "R0201" "R0801" "R0903" "R0904" "R0914")
   python-pycheckers
   "A list of error codes to ignore"
   :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))

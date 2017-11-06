@@ -43,30 +43,6 @@ CONFIG_FILE_NAME = '.pycheckers'
 # default_checkers = 'flake8,pylint,mypy2,mypy3'
 default_checkers = 'pylint,mypy2,mypy3'
 
-# A list of error codes to ignore for PEP8
-default_ignore_codes = [
-    # 'E202',          # Whitespace before ']'
-    # 'E221',          # Multiple spaces before operator
-    # 'E225',          # Missing whitespace around operator
-    # 'E231',          # Missing whitespace after ':'
-    # 'E241',          # Multiple spaces after ':'
-    # 'E261',          # At least two spaces before inline comment
-    # 'W291',          # Trailing whitespace
-    # 'E301',          # Expected 1 blank line, found 0
-    # 'E302',          # Expected 2 blank lines, found 1
-    # 'E303',          # Too many blank lines
-    # 'E401',          # Multiple imports on one line
-    # 'E501',          # Line too long
-
-    # 'E127',          # continuation line over-indented for visual indent
-    # 'E128',          # continuation line under-indented for visual indent
-    # 'E711',          # comparison to None should be...
-    # 'E712',          # comparison to True/False should be ...
-
-    'C0411',           # external import "..." comes before "..."
-    'C0413',           # Import "..." should be placed at the top of the module
-]
-
 # End of customization #
 
 
@@ -123,15 +99,11 @@ class LintRunner(object):
 
     output_matcher = re.compile(r'')
 
-    sane_default_ignore_codes = set()      # type: Set[str]
-
     command = ''
 
-    def __init__(self, ignore_codes, options, use_sane_defaults=True):
+    def __init__(self, ignore_codes, options):
         # type: (Tuple[str, ...], Namespace, bool) -> None
         self.ignore_codes = set(ignore_codes)
-        if use_sane_defaults:
-            self.ignore_codes |= self.sane_default_ignore_codes
         self.options = options
 
     @property
@@ -369,25 +341,6 @@ class PylintRunner(LintRunner):
         r'\((?P<symbol>[^)]*)\)'
         r'\s*(?P<context>[^\]]*)\]'
         r'\s*(?P<description>.*)$')
-
-    sane_default_ignore_codes = {
-        "C0103",  # Naming convention
-        "C0111",  # Missing Docstring
-        "W0142",
-        "W0201",  # "Attribute defined outside __init__"
-        "W0232",  # No __init__
-        "W0403",
-        "W0511",
-        "E1002",  # Use super on old-style class
-        "E1101",
-        "E1103",  # Instance of x has no y member
-                  # (but some types could not be inferred")
-        "R0201",  # Method could be a function
-        "R0801",  # Similar lines in * files
-        "R0903",  # Too few public methods
-        "R0904",  # Too many public methods
-        "R0914",  # Too many local variables
-    }
 
     @classmethod
     def fixup_data(cls, _line, data):
@@ -686,7 +639,7 @@ def parse_args():
                         default=default_checkers,
                         help="Comma-separated list of checkers")
     parser.add_argument("-i", "--ignore-codes", dest="ignore_codes",
-                        default=','.join(default_ignore_codes),
+                        default='',
                         help="Comma-separated list of error codes to ignore")
     parser.add_argument('--max-line-length', dest='max_line_length',
                         default=80, action='store',
