@@ -172,7 +172,7 @@
   :safe #'stringp)
 
 (flycheck-def-option-var flycheck-pycheckers-checkers '(pylint mypy2 mypy3) python-pycheckers
-  "The set of enabled checkers to run"
+  "The set of enabled checkers to run."
   :type '(set
           (const :tag "pylint" pylint)
           (const :tag "PEP8" pep8)
@@ -185,7 +185,9 @@
     '("C0411" "C0413" "C0103" "C0111" "W0142" "W0201" "W0232" "W0403" "W0511"
       "E1002" "E1101" "E1103" "R0201" "R0801" "R0903" "R0904" "R0914")
   python-pycheckers
-  "A list of error codes to ignore"
+  "A list of error codes to ignore.
+
+Can be further customized via the \".pycheckers config file.\""
   :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
 
 (flycheck-def-option-var flycheck-pycheckers-max-line-length 80
@@ -194,15 +196,26 @@
   :type 'integer)
 
 (flycheck-def-option-var flycheck-pycheckers-multi-thread "true"
-  python-pycheckers
-  "Whether to run multiple checkers simultaneously"
+    python-pycheckers
+  "Whether to run multiple checkers simultaneously."
   :type '(radio (const :tag "Multi-threaded" "true")
           (const :tag "Single-threaded" "false")))
 
 (flycheck-def-option-var flycheck-pycheckers-venv-root "~/.virtualenvs"
    python-pycheckers
-   "Directory containing the collection of virtual environments"
+   "Directory containing the collection of virtual environments."
    :type 'string)
+
+(flycheck-def-option-var flycheck-pycheckers-report-errors-inline "true"
+   python-pycheckers
+   "Whether to splice failing checkers' STDERR inline with other errors.
+
+This is mainly used to debug pycheckers.py itself, along with the
+checkers that it runs.  When a checker fails for some reason,
+e.g. https://github.com/msherry/flycheck-pycheckers/issues/6,
+this will report the error in the `flycheck-list-errors' buffer."
+   :type '(radio (const :tag "Yes" "true")
+           (const :tag "No" "false")))
 
 (flycheck-define-command-checker 'python-pycheckers
   "Multiple python syntax checker.
@@ -218,6 +231,7 @@ per-directory."
              "--max-line-length" (eval (number-to-string flycheck-pycheckers-max-line-length))
              "--multi-thread" (eval flycheck-pycheckers-multi-thread)
              "--venv-root" (eval flycheck-pycheckers-venv-root)
+             "--report-checker-errors-inline" (eval flycheck-pycheckers-report-errors-inline)
              (config-file "--pylint-rcfile" flycheck-pycheckers-pylintrc)
              ;; Need `source-inplace' for relative imports (e.g. `from .foo
              ;; import bar'), see https://github.com/flycheck/flycheck/issues/280

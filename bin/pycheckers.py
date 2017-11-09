@@ -121,6 +121,10 @@ class LintRunner(object):
         # type: (str) -> Tuple[str, ...]
         return ()
 
+    def get_env_vars(self):
+        # type: () -> Dict[str, str]
+        return {}
+
     def fixup_data(self, _line, data):
         # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
         return data
@@ -131,6 +135,11 @@ class LintRunner(object):
         if m:
             return m.groupdict()
         return None
+
+    def process_returncode(self, _returncode):
+        # type: (int) -> bool
+        """Return True if the checker's returncode indicates successful check, False otherwise"""
+        return True
 
     def _process_streams(self, *streams):
         # type: (*List[str]) -> Tuple[int, List[str]]
@@ -191,7 +200,8 @@ class LintRunner(object):
             args.extend(self.get_run_flags(filename))
             args.append(filename)
             process = Popen(
-                args, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+                args, stdout=PIPE, stderr=PIPE, universal_newlines=True,
+                env=dict(os.environ, **self.get_env_vars()))
         except Exception as e:                   # pylint: disable=broad-except
             print(e, args)
             return 1, [str(e)]
@@ -200,6 +210,16 @@ class LintRunner(object):
         process.wait()
         errors_or_warnings, out_lines = self._process_streams(
             out.splitlines(), err.splitlines())
+
+        if not self.process_returncode(process.returncode):
+            errors_or_warnings += 1
+            out_lines += [
+                ('WARNING : {}:Checker indicated failure of some kind at {} line 1.'.format(
+                    self.command, filename))]
+            if self.options.report_checker_errors_inline:
+                for line in err.splitlines():
+                    out_lines += ['WARNING : {}:{} at {} line 1.'.format(
+                        self.command, line, filename)]
 
         return errors_or_warnings, out_lines
 
@@ -365,6 +385,18 @@ class PylintRunner(LintRunner):
             '--max-line-length', str(self.options.max_line_length),
             '--rcfile', self.options.pylint_rcfile,
         )
+
+    def get_env_vars(self):
+        # type: () -> Dict[str, str]
+        env = {}
+        if self.options.pylint_rcfile:
+            env['PYLINTRC'] = self.options.pylint_rcfile
+        return env
+
+    def process_returncode(self, returncode):
+        # type: (int) -> bool
+        # https://docs.pylint.org/en/1.6.0/run.html, pylint returns a bit-encoded exit code.
+        return not returncode & 1
 
 
 class MyPy2Runner(LintRunner):
@@ -661,6 +693,10 @@ def parse_args():
     parser.add_argument('--mypy-config-file', default=None,
                         dest='mypy_config_file',
                         help='Location of a config file for mypy')
+    parser.add_argument('--report-checker-errors-inline', type=str2bool, default=True,
+                        action='store',
+                        help=("Whether to fake failing checkers's STDERR as a reported "
+                              "error for easier display."))
 
     return parser.parse_args()
 
