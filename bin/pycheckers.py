@@ -396,7 +396,7 @@ class PylintRunner(LintRunner):
     def process_returncode(self, returncode):
         # type: (int) -> bool
         # https://docs.pylint.org/en/1.6.0/run.html, pylint returns a bit-encoded exit code.
-        return not returncode & 1
+        return not (returncode & 1 or returncode & 32)
 
 
 class MyPy2Runner(LintRunner):
