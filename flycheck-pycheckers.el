@@ -2,7 +2,7 @@
 
 ;; Copyright Marc Sherry <msherry@gmail.com>
 ;; Homepage: https://github.com/msherry/flycheck-pycheckers
-;; Version: 0.4
+;; Version: 0.5
 ;; Package-Requires: ((flycheck "0.18"))
 ;; Keywords: convenience, tools, languages
 
@@ -187,7 +187,17 @@
   python-pycheckers
   "A list of error codes to ignore.
 
-Can be further customized via the \".pycheckers config file.\""
+Can be further customized via the \".pycheckers\" config file."
+  :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
+
+(flycheck-def-option-var flycheck-pycheckers-enabled-codes
+    '("W0613")
+  python-pycheckers
+  "A list of error codes to enable.
+
+Useful for overriding defaults set in a company-wide .pylintrc,
+for example.  Can be further customized via the \".pycheckers\"
+config file."
   :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
 
 (flycheck-def-option-var flycheck-pycheckers-max-line-length 80
@@ -227,7 +237,8 @@ per-directory."
   :command `(,flycheck-pycheckers-command
              (eval flycheck-pycheckers-args)
              "-i" (eval (mapconcat 'identity flycheck-pycheckers-ignore-codes ","))
-             "-c" (eval (mapconcat #'symbol-name flycheck-pycheckers-checkers ","))
+             "-e" (eval (mapconcat 'identity flycheck-pycheckers-enabled-codes ","))
+             "--checkers" (eval (mapconcat #'symbol-name flycheck-pycheckers-checkers ","))
              "--max-line-length" (eval (number-to-string flycheck-pycheckers-max-line-length))
              "--multi-thread" (eval flycheck-pycheckers-multi-thread)
              "--venv-root" (eval flycheck-pycheckers-venv-root)
