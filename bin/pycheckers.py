@@ -71,8 +71,8 @@ def str2bool(v):
     raise ArgumentTypeError('Boolean value expected.')
 
 
-def croak(msgs, filename=None):
-    # type: (Tuple[str], Optional[str]) -> None
+def croak(msgs, filename):
+    # type: (Tuple[str], str) -> None
     for m in msgs:
         print('ERROR :pycheckers:{} at {} line 1.'.format(m.strip(), filename), file=sys.stderr)
     sys.exit(1)
@@ -122,7 +122,7 @@ class LintRunner(object):
         return {}
 
     def fixup_data(self, _line, data):
-        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
+        # type: (str, Dict[str, str]) -> Dict[str, str]
         return data
 
     def process_output(self, line):
@@ -186,7 +186,7 @@ class LintRunner(object):
             # Return a parseable error message so the normal parsing mechanism
             # can display it
             return 1, [
-                ('WARNING : {}:Checker not found on PATH, '
+                ('ERROR : {}:Checker not found on PATH, '
                  'unable to check at {} line 1.'.format(
                      self.command, filename))]
 
@@ -241,7 +241,7 @@ class PyflakesRunner(LintRunner):
 
     @classmethod
     def fixup_data(cls, _line, data):
-        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
+        # type: (str, Dict[str, str]) -> Dict[str, str]
         if 'imported but unused' in data['description']:
             data['level'] = 'WARNING'
         elif 'redefinition of unused' in data['description']:
@@ -273,7 +273,7 @@ class Flake8Runner(LintRunner):
 
     @classmethod
     def fixup_data(cls, _line, data):
-        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
+        # type: (str, Dict[str, str]) -> Dict[str, str]
         if data['error_type'] in ['E']:
             data['level'] = 'WARNING'
         elif data['error_type'] in ['F']:
@@ -327,7 +327,7 @@ class Pep8Runner(LintRunner):
 
     @classmethod
     def fixup_data(cls, _line, data):
-        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
+        # type: (str, Dict[str, str]) -> Dict[str, str]
         data['level'] = 'WARNING'
         return data
 
@@ -364,7 +364,7 @@ class PylintRunner(LintRunner):
 
     @classmethod
     def fixup_data(cls, _line, data):
-        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
+        # type: (str, Dict[str, str]) -> Dict[str, str]
         if data['error_type'].startswith('E'):
             data['level'] = 'ERROR'
         else:
@@ -460,10 +460,10 @@ class MyPy2Runner(LintRunner):
         return tuple(flags)
 
     def fixup_data(self, _line, data):
-        # type: (str, Dict[str, str]) -> Optional[Dict[str, str]]
+        # type: (str, Dict[str, str]) -> Dict[str, str]
         data['level'] = data['level'].upper()
         if data['level'] == 'NOTE':
-            return None
+            return {}
         return data
 
 

@@ -249,11 +249,11 @@ per-directory."
              source-inplace)
   :error-patterns
   '((error line-start
-          "ERROR " (optional (id (one-or-more (not (any ":"))))) ":"
-          (message) " at " (file-name) " line " line (optional "," column) "." line-end)
+     "ERROR " (optional (id (one-or-more (not (any ":"))))) ":"
+     (message) " at " (file-name) " line " line (optional "," column) "." line-end)
     (warning line-start
-            "WARNING " (optional (id (one-or-more (not (any ":"))))) ":"
-            (message) " at " (file-name) " line " line (optional "," column) "." line-end))
+     "WARNING " (optional (id (one-or-more (not (any ":"))))) ":"
+     (message) " at " (file-name) " line " line (optional "," column) "." line-end))
   :modes 'python-mode)
 
 ;;; ###autoload
