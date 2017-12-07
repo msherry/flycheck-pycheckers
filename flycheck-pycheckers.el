@@ -190,7 +190,7 @@
 Can be further customized via the \".pycheckers\" config file."
   :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
 
-(flycheck-def-option-var flycheck-pycheckers-enabled-codes
+(flycheck-def-option-var flycheck-pycheckers-enable-codes
     '("W0613")
   python-pycheckers
   "A list of error codes to enable.
@@ -237,7 +237,7 @@ per-directory."
   :command `(,flycheck-pycheckers-command
              (eval flycheck-pycheckers-args)
              "-i" (eval (mapconcat 'identity flycheck-pycheckers-ignore-codes ","))
-             "-e" (eval (mapconcat 'identity flycheck-pycheckers-enabled-codes ","))
+             "-e" (eval (mapconcat 'identity flycheck-pycheckers-enable-codes ","))
              "--checkers" (eval (mapconcat #'symbol-name flycheck-pycheckers-checkers ","))
              "--max-line-length" (eval (number-to-string flycheck-pycheckers-max-line-length))
              "--multi-thread" (eval flycheck-pycheckers-multi-thread)
