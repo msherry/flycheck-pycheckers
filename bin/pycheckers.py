@@ -96,10 +96,10 @@ class LintRunner(object):
 
     command = ''
 
-    def __init__(self, ignored_codes, enabled_codes, options):
+    def __init__(self, ignore_codes, enable_codes, options):
         # type: (Tuple[str], Tuple[str], Namespace) -> None
-        self.ignored_codes = set(ignored_codes)
-        self.enabled_codes = set(enabled_codes)
+        self.ignore_codes = set(ignore_codes)
+        self.enable_codes = set(enable_codes)
         self.options = options
 
     @property
@@ -298,9 +298,9 @@ class Flake8Runner(LintRunner):
     def get_run_flags(self, _filename):
         # type: (str) -> Tuple[str, ...]
         return (
-            '--ignore=' + ','.join(self.ignored_codes),
+            '--ignore=' + ','.join(self.ignore_codes),
             # TODO: --select, but additive
-            # '-select=' + ','.join(self.enabled_codes),
+            # '-select=' + ','.join(self.enable_codes),
             '--max-line-length', str(self.options.max_line_length),
         )
 
@@ -335,9 +335,9 @@ class Pep8Runner(LintRunner):
         # type: (str) -> Tuple[str, ...]
         return (
             '--repeat',
-            '--ignore=' + ','.join(self.ignored_codes),
+            '--ignore=' + ','.join(self.ignore_codes),
             # TODO: make this additive, not a replacement
-            # '--select=' + ','.join(self.enabled_codes),
+            # '--select=' + ','.join(self.enable_codes),
             '--max-line-length', str(self.options.max_line_length),
         )
 
@@ -380,9 +380,9 @@ class PylintRunner(LintRunner):
             '--msg-template', ('{path}:{line}:{column}: '
                                '[{msg_id}({symbol})] {msg}'),
             '--reports', 'n',
-            '--disable=' + ','.join(self.ignored_codes),
+            '--disable=' + ','.join(self.ignore_codes),
             # This is additive, not replacing
-            '--enable=' + ','.join(self.enabled_codes),
+            '--enable=' + ','.join(self.enable_codes),
             '--dummy-variables-rgx=' + '_.*',
             '--max-line-length', str(self.options.max_line_length),
             '--rcfile', self.options.pylint_rcfile,
@@ -553,10 +553,10 @@ def update_options_locally(options):
     return options
 
 
-def run_one_checker(ignore_codes, enabled_codes, options, source_file, checker_name):
+def run_one_checker(ignore_codes, enable_codes, options, source_file, checker_name):
     # type: (Tuple[str], Tuple[str], Namespace, str, str) -> Tuple[int, List[str]]
     checker_class = RUNNERS[checker_name]
-    runner = checker_class(ignore_codes, enabled_codes, options)
+    runner = checker_class(ignore_codes, enable_codes, options)
     errors_or_warnings, out_lines = runner.run(source_file)
     return (errors_or_warnings, out_lines)
 
@@ -672,10 +672,10 @@ def parse_args():
     parser.add_argument("-c", "--checkers", dest="checkers",
                         default=default_checkers,
                         help="Comma-separated list of checkers")
-    parser.add_argument("-i", "--ignore-codes", dest="ignored_codes",
+    parser.add_argument("-i", "--ignore-codes", dest="ignore_codes",
                         default='',
                         help="Comma-separated list of error codes to ignore")
-    parser.add_argument("-e", "--enabled-codes", dest="enabled_codes",
+    parser.add_argument("-e", "--enable-codes", dest="enable_codes",
                         default='',
                         help="Comma-separated list of error codes to ignore")
     parser.add_argument('--max-line-length', dest='max_line_length',
@@ -723,8 +723,8 @@ def main():
     options = update_options_locally(options)
 
     checkers = options.checkers
-    ignored_codes = tuple(c for c in options.ignored_codes.split(",") if c)
-    enabled_codes = tuple(c for c in options.enabled_codes.split(",") if c)
+    ignore_codes = tuple(c for c in options.ignore_codes.split(",") if c)
+    enable_codes = tuple(c for c in options.enable_codes.split(",") if c)
     set_path_for_virtualenv(source_file, options.venv_root)
 
     checker_names = [checker.strip() for checker in checkers.split(',')]
@@ -740,7 +740,7 @@ def main():
         p = Pool(cpu_count() + 1)
 
         func = partial(
-            run_one_checker, ignored_codes, enabled_codes, options, source_file)
+            run_one_checker, ignore_codes, enable_codes, options, source_file)
 
         outputs = p.map(func, checker_names)
         p.close()
@@ -752,7 +752,7 @@ def main():
         out_lines_list = []
         for checker_name in checker_names:
             e_or_w, o_l = run_one_checker(
-                ignored_codes, enabled_codes, options, source_file, checker_name)
+                ignore_codes, enable_codes, options, source_file, checker_name)
             errors_or_warnings += e_or_w
             out_lines_list.append(o_l)
 
