@@ -190,6 +190,7 @@
 Can be further customized via the \".pycheckers\" config file."
   :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
 
+(define-obsolete-variable-alias 'flycheck-pycheckers-enabled-codes 'flycheck-pycheckers-enable-codes)
 (flycheck-def-option-var flycheck-pycheckers-enable-codes
     '("W0613")
   python-pycheckers
@@ -199,7 +200,6 @@ Useful for overriding defaults set in a company-wide .pylintrc,
 for example.  Can be further customized via the \".pycheckers\"
 config file."
   :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
-(define-obsolete-variable-alias 'flycheck-pycheckers-enabled-codes 'flycheck-pycheckers-enable-codes)
 
 (flycheck-def-option-var flycheck-pycheckers-max-line-length 80
   python-pycheckers
