@@ -31,7 +31,7 @@ try:
     # pylint: disable=unused-import, ungrouped-imports
     from argparse import Namespace
     from typing import (
-        Any, Dict, List, IO, Optional, Set, Tuple)
+        Any, Dict, List, IO, Iterable, Optional, Set, Tuple)
 except ImportError:
     pass
 
@@ -98,8 +98,8 @@ class LintRunner(object):
 
     def __init__(self, ignore_codes, enable_codes, options):
         # type: (Tuple[str], Tuple[str], Namespace) -> None
-        self.ignore_codes = set(ignore_codes)
-        self.enable_codes = set(enable_codes)
+        self.ignore_codes = set(ignore_codes) if ignore_codes is not None else None
+        self.enable_codes = set(enable_codes) if enable_codes is not None else None
         self.options = options
 
     @property
@@ -114,7 +114,7 @@ class LintRunner(object):
         return self.command
 
     def get_run_flags(self, _filename):
-        # type: (str) -> Tuple[str, ...]
+        # type: (str) -> Iterable[str]
         return ()
 
     def get_env_vars(self):
@@ -128,9 +128,7 @@ class LintRunner(object):
     def process_output(self, line):
         # type: (str) -> Optional[Dict[str, str]]
         m = self.output_matcher.match(line)
-        if m:
-            return m.groupdict()
-        return None
+        return m.groupdict() if m else None
 
     def process_returncode(self, _returncode):
         # type: (int) -> bool
@@ -296,13 +294,18 @@ class Flake8Runner(LintRunner):
         return data
 
     def get_run_flags(self, _filename):
-        # type: (str) -> Tuple[str, ...]
-        return (
-            '--ignore=' + ','.join(self.ignore_codes),
+        # type: (str) -> Iterable[str]
+        args = []
+        if self.ignore_codes is not None:
+            # We're explicitly ignoring something, even if that something is
+            # nothing (i.e. `--ignore=`, meaning ignore nothing)
+            args.append('--ignore=' + ','.join(self.ignore_codes))
+        args += [
             # TODO: --select, but additive
             # '-select=' + ','.join(self.enable_codes),
             '--max-line-length', str(self.options.max_line_length),
-        )
+        ]
+        return args
 
 
 class Pep8Runner(LintRunner):
@@ -332,14 +335,17 @@ class Pep8Runner(LintRunner):
         return data
 
     def get_run_flags(self, _filename):
-        # type: (str) -> Tuple[str, ...]
-        return (
+        # type: (str) -> Iterable[str]
+        args = []
+        if self.ignore_codes is not None:
+            args.append('--ignore=' + ','.join(self.ignore_codes))
+        args += [
             '--repeat',
-            '--ignore=' + ','.join(self.ignore_codes),
             # TODO: make this additive, not a replacement
             # '--select=' + ','.join(self.enable_codes),
             '--max-line-length', str(self.options.max_line_length),
-        )
+        ]
+        return args
 
 
 class PylintRunner(LintRunner):
@@ -375,18 +381,21 @@ class PylintRunner(LintRunner):
         return data
 
     def get_run_flags(self, _filename):
-        # type: (str) -> Tuple[str, ...]
-        return (
+        # type: (str) -> Iterable[str]
+        args = []
+        if self.ignore_codes is not None:
+            args.append('--disable=' + ','.join(self.ignore_codes))
+        args += [
             '--msg-template', ('{path}:{line}:{column}: '
                                '[{msg_id}({symbol})] {msg}'),
             '--reports', 'n',
-            '--disable=' + ','.join(self.ignore_codes),
             # This is additive, not replacing
             '--enable=' + ','.join(self.enable_codes),
             '--dummy-variables-rgx=' + '_.*',
             '--max-line-length', str(self.options.max_line_length),
             '--rcfile', self.options.pylint_rcfile,
-        )
+        ]
+        return args
 
     def get_env_vars(self):
         # type: () -> Dict[str, str]
@@ -440,7 +449,7 @@ class MyPy2Runner(LintRunner):
         return cache_dir
 
     def get_run_flags(self, filename):
-        # type: (str) -> Tuple[str, ...]
+        # type: (str) -> Iterable[str]
         """Determine which mypy (2 or 3) to run, find the cache dir and config file"""
         flags = [
             '--cache-dir={}'.format(self._get_cache_dir(filename)),
@@ -457,7 +466,7 @@ class MyPy2Runner(LintRunner):
         if self.name == 'mypy':
             # mypy2 mode
             flags += ['--py2']
-        return tuple(flags)
+        return flags
 
     def fixup_data(self, _line, data):
         # type: (str, Dict[str, str]) -> Dict[str, str]
@@ -673,7 +682,6 @@ def parse_args():
                         default=default_checkers,
                         help="Comma-separated list of checkers")
     parser.add_argument("-i", "--ignore-codes", dest="ignore_codes",
-                        default='',
                         help="Comma-separated list of error codes to ignore")
     parser.add_argument("-e", "--enable-codes", dest="enable_codes",
                         default='',
@@ -723,8 +731,9 @@ def main():
     options = update_options_locally(options)
 
     checkers = options.checkers
-    ignore_codes = tuple(c for c in options.ignore_codes.split(",") if c)
-    enable_codes = tuple(c for c in options.enable_codes.split(",") if c)
+    ignore_codes = (tuple(c.strip() for c in options.ignore_codes.split(",") if c)
+                    if options.ignore_codes is not None else None)
+    enable_codes = tuple(c.strip() for c in options.enable_codes.split(",") if c)
     set_path_for_virtualenv(source_file, options.venv_root)
 
     checker_names = [checker.strip() for checker in checkers.split(',')]
