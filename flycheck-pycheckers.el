@@ -187,8 +187,16 @@
   python-pycheckers
   "A list of error codes to ignore.
 
+A nil value (or empty list) means that this option will not be
+used at all, and instead, ignored error codes will come from any
+config files, if found.  A value of `none' (the symbol) means that
+no codes will be ignored -- i.e., config file options will not be
+used, and all errors will be reported.
+
 Can be further customized via the \".pycheckers\" config file."
-  :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
+  :type '(radio :tag "Ignored errors"
+          (repeat :tag "Codes (overrides config files)" (string :tag "Error/Warning code"))
+          (const :tag "Don't ignore any errors (report everything). Overrides config files." none)))
 
 (define-obsolete-variable-alias 'flycheck-pycheckers-enabled-codes 'flycheck-pycheckers-enable-codes)
 (flycheck-def-option-var flycheck-pycheckers-enable-codes
@@ -237,7 +245,13 @@ per-directory."
 
   :command `(,flycheck-pycheckers-command
              (eval flycheck-pycheckers-args)
-             "-i" (eval (mapconcat 'identity flycheck-pycheckers-ignore-codes ","))
+             ;; When `flycheck-pycheckers-ignore-codes' is a (non-nil) list,
+             ;; use it. When nil (empty list), omit the parameter entirely,
+             ;; falling back to config files. Any other value means "ignore
+             ;; nothing" (report all errors).
+             (eval (when flycheck-pycheckers-ignore-codes
+                     (concat "--ignore-codes= " (when (listp flycheck-pycheckers-ignore-codes)
+                                                  (mapconcat 'identity flycheck-pycheckers-ignore-codes ",")))))
              "-e" (eval (mapconcat 'identity flycheck-pycheckers-enable-codes ","))
              "--checkers" (eval (mapconcat #'symbol-name flycheck-pycheckers-checkers ","))
              "--max-line-length" (eval (number-to-string flycheck-pycheckers-max-line-length))
