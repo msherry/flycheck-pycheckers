@@ -121,8 +121,8 @@ class LintRunner(object):
         # type: () -> Dict[str, str]
         return {}
 
-    def fixup_data(self, _line, data):
-        # type: (str, Dict[str, str]) -> Dict[str, str]
+    def fixup_data(self, _line, data, _filename):
+        # type: (str, Dict[str, str], str) -> Dict[str, str]
         return data
 
     def process_output(self, line):
@@ -135,8 +135,8 @@ class LintRunner(object):
         """Return True if the checker's returncode indicates successful check, False otherwise"""
         return True
 
-    def _process_streams(self, *streams):
-        # type: (*List[str]) -> Tuple[int, List[str]]
+    def _process_streams(self, filename, *streams):
+        # type: (str, *List[str]) -> Tuple[int, List[str]]
         """This runs over both stdout and stderr, counting errors/warnings."""
         if not streams:
             raise ValueError('No streams passed to _process_streams')
@@ -148,7 +148,7 @@ class LintRunner(object):
                 if match:
                     tokens = dict(self.output_template)
                     # Return None from fixup_data to ignore this error
-                    fixed_up = self.fixup_data(line, match)
+                    fixed_up = self.fixup_data(line, match, filename)
                     if fixed_up:
                         # Prepend the command name to the description (if
                         # present) so we know which checker threw which error
@@ -203,7 +203,7 @@ class LintRunner(object):
         out, err = process.communicate()
         process.wait()
         errors_or_warnings, out_lines = self._process_streams(
-            out.splitlines(), err.splitlines())
+            filename, out.splitlines(), err.splitlines())
 
         if not self.process_returncode(process.returncode):
             errors_or_warnings += 1
@@ -238,8 +238,8 @@ class PyflakesRunner(LintRunner):
         r'(?P<description>.+)$')
 
     @classmethod
-    def fixup_data(cls, _line, data):
-        # type: (str, Dict[str, str]) -> Dict[str, str]
+    def fixup_data(cls, _line, data, _filename):
+        # type: (str, Dict[str, str], str) -> Dict[str, str]
         if 'imported but unused' in data['description']:
             data['level'] = 'WARNING'
         elif 'redefinition of unused' in data['description']:
@@ -270,8 +270,8 @@ class Flake8Runner(LintRunner):
         '(?P<description>.+)$')
 
     @classmethod
-    def fixup_data(cls, _line, data):
-        # type: (str, Dict[str, str]) -> Dict[str, str]
+    def fixup_data(cls, _line, data, _filename):
+        # type: (str, Dict[str, str], str) -> Dict[str, str]
         if data['error_type'] in ['E']:
             data['level'] = 'WARNING'
         elif data['error_type'] in ['F']:
@@ -329,8 +329,8 @@ class Pep8Runner(LintRunner):
         r'(?P<description>.+)$')
 
     @classmethod
-    def fixup_data(cls, _line, data):
-        # type: (str, Dict[str, str]) -> Dict[str, str]
+    def fixup_data(cls, _line, data, _filename):
+        # type: (str, Dict[str, str], str) -> Dict[str, str]
         data['level'] = 'WARNING'
         return data
 
@@ -369,8 +369,8 @@ class PylintRunner(LintRunner):
         r'\s*(?P<description>.*)$')
 
     @classmethod
-    def fixup_data(cls, _line, data):
-        # type: (str, Dict[str, str]) -> Dict[str, str]
+    def fixup_data(cls, _line, data, _filename):
+        # type: (str, Dict[str, str], str) -> Dict[str, str]
         if data['error_type'].startswith('E'):
             data['level'] = 'ERROR'
         else:
@@ -468,8 +468,14 @@ class MyPy2Runner(LintRunner):
             flags += ['--py2']
         return flags
 
-    def fixup_data(self, _line, data):
-        # type: (str, Dict[str, str]) -> Dict[str, str]
+    def fixup_data(self, _line, data, filename):
+        # type: (str, Dict[str, str], str) -> Dict[str, str]
+
+        # Mypy returns lines for files other than the current one -- filter
+        # those out
+        if filename not in data['filename']:
+            return {}
+
         data['level'] = data['level'].upper()
         if data['level'] == 'NOTE':
             return {}
