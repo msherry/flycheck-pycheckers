@@ -113,7 +113,7 @@ class LintRunner(object):
         """
         return self.command
 
-    def get_run_flags(self, _filename):
+    def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
         return ()
 
@@ -121,7 +121,11 @@ class LintRunner(object):
         # type: () -> Dict[str, str]
         return {}
 
-    def fixup_data(self, _line, data, _filename):
+    def get_filepath(self, filepath):
+        # type: (str) -> str
+        return filepath
+
+    def fixup_data(self, _line, data, _filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
         return data
 
@@ -135,7 +139,7 @@ class LintRunner(object):
         """Return True if the checker's returncode indicates successful check, False otherwise"""
         return True
 
-    def _process_streams(self, filename, *streams):
+    def _process_streams(self, filepath, *streams):
         # type: (str, *List[str]) -> Tuple[int, List[str]]
         """This runs over both stdout and stderr, counting errors/warnings."""
         if not streams:
@@ -148,7 +152,7 @@ class LintRunner(object):
                 if match:
                     tokens = dict(self.output_template)
                     # Return None from fixup_data to ignore this error
-                    fixed_up = self.fixup_data(line, match, filename)
+                    fixed_up = self.fixup_data(line, match, filepath)
                     if fixed_up:
                         # Prepend the command name to the description (if
                         # present) so we know which checker threw which error
@@ -178,7 +182,7 @@ class LintRunner(object):
         retcode = call(args)
         return retcode == 0
 
-    def run(self, filename):
+    def run(self, filepath):
         # type: (str) -> Tuple[int, List[str]]
         if not self._executable_exists():
             # Return a parseable error message so the normal parsing mechanism
@@ -186,13 +190,15 @@ class LintRunner(object):
             return 1, [
                 ('ERROR : {}:Checker not found on PATH, '
                  'unable to check at {} line 1.'.format(
-                     self.command, filename))]
+                     self.command, filepath))]
 
         # `env` to use a virtualenv, if found
         args = ['/usr/bin/env', self.command]
         try:
-            args.extend(self.get_run_flags(filename))
-            args.append(filename)
+            # Get checker arguments
+            args.extend(self.get_run_flags(filepath))
+            # Get a checker-specific filename, if necessary
+            args.append(self.get_filepath(filepath))
             process = Popen(
                 args, stdout=PIPE, stderr=PIPE, universal_newlines=True,
                 env=dict(os.environ, **self.get_env_vars()))
@@ -203,17 +209,17 @@ class LintRunner(object):
         out, err = process.communicate()
         process.wait()
         errors_or_warnings, out_lines = self._process_streams(
-            filename, out.splitlines(), err.splitlines())
+            filepath, out.splitlines(), err.splitlines())
 
         if not self.process_returncode(process.returncode):
             errors_or_warnings += 1
             out_lines += [
                 ('WARNING : {}:Checker indicated failure of some kind at {} line 1.'.format(
-                    self.command, filename))]
+                    self.command, filepath))]
             if self.options.report_checker_errors_inline:
                 for line in err.splitlines():
                     out_lines += ['WARNING : {}:{} at {} line 1.'.format(
-                        self.command, line, filename)]
+                        self.command, line, filepath)]
 
         return errors_or_warnings, out_lines
 
@@ -238,7 +244,7 @@ class PyflakesRunner(LintRunner):
         r'(?P<description>.+)$')
 
     @classmethod
-    def fixup_data(cls, _line, data, _filename):
+    def fixup_data(cls, _line, data, _filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
         if 'imported but unused' in data['description']:
             data['level'] = 'WARNING'
@@ -270,7 +276,7 @@ class Flake8Runner(LintRunner):
         '(?P<description>.+)$')
 
     @classmethod
-    def fixup_data(cls, _line, data, _filename):
+    def fixup_data(cls, _line, data, _filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
         if data['error_type'] in ['E']:
             data['level'] = 'WARNING'
@@ -293,7 +299,7 @@ class Flake8Runner(LintRunner):
 
         return data
 
-    def get_run_flags(self, _filename):
+    def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
         args = []
         if self.ignore_codes is not None:
@@ -329,12 +335,12 @@ class Pep8Runner(LintRunner):
         r'(?P<description>.+)$')
 
     @classmethod
-    def fixup_data(cls, _line, data, _filename):
+    def fixup_data(cls, _line, data, _filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
         data['level'] = 'WARNING'
         return data
 
-    def get_run_flags(self, _filename):
+    def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
         args = []
         if self.ignore_codes is not None:
@@ -369,7 +375,7 @@ class PylintRunner(LintRunner):
         r'\s*(?P<description>.*)$')
 
     @classmethod
-    def fixup_data(cls, _line, data, _filename):
+    def fixup_data(cls, _line, data, _filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
         if data['error_type'].startswith('E'):
             data['level'] = 'ERROR'
@@ -380,7 +386,7 @@ class PylintRunner(LintRunner):
             data['description'] += '  ("{}")'.format(data['symbol'])
         return data
 
-    def get_run_flags(self, _filename):
+    def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
         args = []
         if self.ignore_codes is not None:
@@ -423,8 +429,6 @@ class MyPy2Runner(LintRunner):
     _base_flags = [
         '--incremental',
         '--quick-and-dirty',
-        '--ignore-missing-imports',
-        '--strict-optional',
     ]
 
     def _get_cache_dir(self, filename):
@@ -448,38 +452,56 @@ class MyPy2Runner(LintRunner):
             cache_dir = os.path.join(branch_top, 'HEAD')
         return cache_dir
 
-    def get_run_flags(self, filename):
+    def get_run_flags(self, filepath):
         # type: (str) -> Iterable[str]
         """Determine which mypy (2 or 3) to run, find the cache dir and config file"""
-        flags = [
-            '--cache-dir={}'.format(self._get_cache_dir(filename)),
-        ] + self._base_flags
+
+        # TODO: this is a hack, we should clean this up in case the file
+        # legitimately contains this string
+        original_filepath = filepath.replace('flycheck_', '')
+
+        flags = self._base_flags + [
+            '--cache-dir={}'.format(self._get_cache_dir(filepath)),
+        ]
+        if self.name == 'mypy':
+            # mypy2 mode
+            flags += ['--py2']
         if getattr(self.options, 'mypy_config_file', None):
             if not os.path.exists(self.options.mypy_config_file):
                 raise FatalException(
                     "Can't find mypy config file %s" % self.options.mypy_config_file,
-                    filename)
-            # TODO: mypy won't respect per-file config options because our
-            # files are named flycheck_<real_file_name>.py at the time of
-            # check. We may have to submit a PR on mypy.
+                    filepath)
             flags += ['--config-file', self.options.mypy_config_file]
-        if self.name == 'mypy':
-            # mypy2 mode
-            flags += ['--py2']
+
+        # Per Guido's suggestion, use the --shadow-file option to work around
+        # https://github.com/msherry/flycheck-pycheckers/issues/2, so we can
+        # respect per-file mypy.ini config options
+        # TODO: only do this when being run by flycheck?
+        flags += ['--shadow-file', filepath, original_filepath]
         return flags
 
-    def fixup_data(self, _line, data, filename):
+    def fixup_data(self, _line, data, filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
 
         # Mypy returns lines for files other than the current one -- filter
-        # those out
-        if filename not in data['filename']:
+        # those out. Since we may be using the --shadow-file option, check for
+        # the original filename, not the flycheck-munged one
+        original_filename = os.path.basename(filepath).replace('flycheck_', '')
+        if original_filename not in data['filename']:
             return {}
+        # data['filename'] = 'flycheck_' + filename
 
         data['level'] = data['level'].upper()
         if data['level'] == 'NOTE':
             return {}
         return data
+
+    def get_filepath(self, filepath):
+        # type: (str) -> str
+        """Mypy's weird shadow option means we have to pass the original filepath, not
+        the flycheck-munged one
+        """
+        return filepath.replace('flycheck_', '')
 
 
 class MyPy3Runner(MyPy2Runner):
@@ -568,11 +590,11 @@ def update_options_locally(options):
     return options
 
 
-def run_one_checker(ignore_codes, enable_codes, options, source_file, checker_name):
+def run_one_checker(ignore_codes, enable_codes, options, source_file_path, checker_name):
     # type: (Tuple[str], Tuple[str], Namespace, str, str) -> Tuple[int, List[str]]
     checker_class = RUNNERS[checker_name]
     runner = checker_class(ignore_codes, enable_codes, options)
-    errors_or_warnings, out_lines = runner.run(source_file)
+    errors_or_warnings, out_lines = runner.run(source_file_path)
     return (errors_or_warnings, out_lines)
 
 
@@ -730,9 +752,9 @@ def main():
 
     options = parse_args()
 
-    source_file = options.file
-    if not os.path.exists(source_file):
-        raise RuntimeError("Can't find source file %s" % source_file)
+    source_file_path = options.file
+    if not os.path.exists(source_file_path):
+        raise RuntimeError("Can't find source file %s" % source_file_path)
 
     options = update_options_locally(options)
 
@@ -740,7 +762,7 @@ def main():
     ignore_codes = (tuple(c.strip() for c in options.ignore_codes.split(",") if c)
                     if options.ignore_codes is not None else None)
     enable_codes = tuple(c.strip() for c in options.enable_codes.split(",") if c)
-    set_path_for_virtualenv(source_file, options.venv_root)
+    set_path_for_virtualenv(source_file_path, options.venv_root)
 
     checker_names = [checker.strip() for checker in checkers.split(',')]
     try:
@@ -755,7 +777,7 @@ def main():
         p = Pool(cpu_count() + 1)
 
         func = partial(
-            run_one_checker, ignore_codes, enable_codes, options, source_file)
+            run_one_checker, ignore_codes, enable_codes, options, source_file_path)
 
         outputs = p.map(func, checker_names)
         p.close()
@@ -767,7 +789,7 @@ def main():
         out_lines_list = []
         for checker_name in checker_names:
             e_or_w, o_l = run_one_checker(
-                ignore_codes, enable_codes, options, source_file, checker_name)
+                ignore_codes, enable_codes, options, source_file_path, checker_name)
             errors_or_warnings += e_or_w
             out_lines_list.append(o_l)
 

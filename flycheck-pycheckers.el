@@ -271,6 +271,11 @@ per-directory."
      (message) " at " (file-name) " line " line (optional "," column) "." line-end))
   :modes 'python-mode)
 
+(defun flycheck-pycheckers-unsetup ()
+  "Utility function, used for testing only."
+  (interactive)
+  (setq flycheck-checkers (remove 'python-pycheckers flycheck-checkers)))
+
 ;;; ###autoload
 (defun flycheck-pycheckers-setup ()
   "Convenience function to setup the pycheckers flycheck checker."
