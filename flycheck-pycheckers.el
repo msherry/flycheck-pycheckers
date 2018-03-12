@@ -2,7 +2,7 @@
 
 ;; Copyright Marc Sherry <msherry@gmail.com>
 ;; Homepage: https://github.com/msherry/flycheck-pycheckers
-;; Version: 0.6
+;; Version: 0.7
 ;; Package-Requires: ((flycheck "0.18"))
 ;; Keywords: convenience, tools, languages
 
