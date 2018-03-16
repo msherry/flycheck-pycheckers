@@ -530,7 +530,7 @@ def get_options_from_file(file_path):
     config = ConfigParser()
     config.read(file_path)
     # [DEFAULT] section
-    for key, value in config.defaults().iteritems():
+    for key, value in config.defaults().items():
         if is_false(value):
             value = False
         elif is_true(value):
