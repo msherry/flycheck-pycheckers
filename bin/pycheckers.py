@@ -125,6 +125,18 @@ class LintRunner(object):
         # type: (str) -> str
         return filepath
 
+    def construct_args(self, filepath):
+        # type: (str) -> List[str]
+        """Construct the argument list for the parser, suitable for passing to Popen."""
+        # `env` to use a virtualenv, if found
+        args = ['/usr/bin/env', self.command]
+        # Get checker arguments
+        args.extend(self.get_run_flags(filepath))
+        # Get a checker-specific filename, if necessary
+        args.append(self.get_filepath(filepath))
+
+        return args
+
     def fixup_data(self, _line, data, _filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
         return data
@@ -192,13 +204,9 @@ class LintRunner(object):
                  'unable to check at {} line 1.'.format(
                      self.command, filepath))]
 
-        # `env` to use a virtualenv, if found
-        args = ['/usr/bin/env', self.command]
+        args = self.construct_args(filepath)
+
         try:
-            # Get checker arguments
-            args.extend(self.get_run_flags(filepath))
-            # Get a checker-specific filename, if necessary
-            args.append(self.get_filepath(filepath))
             process = Popen(
                 args, stdout=PIPE, stderr=PIPE, universal_newlines=True,
                 env=dict(os.environ, **self.get_env_vars()))
