@@ -407,8 +407,9 @@ class PylintRunner(LintRunner):
             '--enable=' + ','.join(self.enable_codes),
             '--dummy-variables-rgx=' + '_.*',
             '--max-line-length', str(self.options.max_line_length),
-            '--rcfile', self.options.pylint_rcfile,
         ]
+        if self.options.pylint_rcfile:
+            args.extend(['--rcfile', self.options.pylint_rcfile])
         return args
 
     def get_env_vars(self):
@@ -736,7 +737,7 @@ def parse_args():
     parser.add_argument('--venv-root', dest='venv_root',
                         default='~/.virtualenvs', action='store',
                         help='Location of Python virtual environments')
-    parser.add_argument('--pylint-rcfile', default='.pylintrc',
+    parser.add_argument('--pylint-rcfile', default=None,
                         dest='pylint_rcfile',
                         help='Location of a config file for pylint')
     parser.add_argument('--mypy-config-file', default=None,

@@ -38,10 +38,10 @@
 
 ;; Flycheck is opinionated about what checkers should be run (see
 ;; https://github.com/flycheck/flycheck/issues/185), and chaining is difficult
-;; to get right (e.g. see https://github.com/flycheck/flycheck/issues/836).
-;; This package assumes that the user knows what they want, and can configure
-;; their checkers accordingly -- if they want to run both flake8 and pylint,
-;; that's fine.
+;; to get right (e.g. see https://github.com/flycheck/flycheck/issues/836,
+;; https://github.com/flycheck/flycheck/issues/1300).  This package assumes
+;; that the user knows what they want, and can configure their checkers
+;; accordingly -- if they want to run both flake8 and pylint, that's fine.
 ;;
 ;; This also allows us to run multiple syntax checkers in parallel, rather than
 ;; sequentially.
