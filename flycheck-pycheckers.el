@@ -250,14 +250,16 @@ per-directory."
              ;; falling back to config files. Any other value means "ignore
              ;; nothing" (report all errors).
              (eval (when flycheck-pycheckers-ignore-codes
-                     (concat "--ignore-codes= " (when (listp flycheck-pycheckers-ignore-codes)
-                                                  (mapconcat 'identity flycheck-pycheckers-ignore-codes ",")))))
-             "-e" (eval (mapconcat 'identity flycheck-pycheckers-enable-codes ","))
+                     (concat "--ignore-codes=" (when (listp flycheck-pycheckers-ignore-codes)
+                                                 (mapconcat 'identity flycheck-pycheckers-ignore-codes ",")))))
+             (eval (when flycheck-pycheckers-enable-codes
+                     (concat "--enable-codes=" (when (listp flycheck-pycheckers-enable-codes)
+                                                 (mapconcat 'identity flycheck-pycheckers-enable-codes ",")))))
              "--checkers" (eval (mapconcat #'symbol-name flycheck-pycheckers-checkers ","))
-             "--max-line-length" (eval (number-to-string flycheck-pycheckers-max-line-length))
-             "--multi-thread" (eval flycheck-pycheckers-multi-thread)
-             "--venv-root" (eval flycheck-pycheckers-venv-root)
-             "--report-checker-errors-inline" (eval flycheck-pycheckers-report-errors-inline)
+             (option "--max-line-length" flycheck-pycheckers-max-line-length nil number-to-string)
+             (option "--multi-thread" flycheck-pycheckers-multi-thread)
+             (option "--venv-root" flycheck-pycheckers-venv-root)
+             (option "--report-checker-errors-inline" flycheck-pycheckers-report-errors-inline)
              (config-file "--pylint-rcfile" flycheck-pycheckers-pylintrc)
              ;; Need `source-inplace' for relative imports (e.g. `from .foo
              ;; import bar'), see https://github.com/flycheck/flycheck/issues/280
