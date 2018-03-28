@@ -134,7 +134,6 @@ class LintRunner(object):
         args.extend(self.get_run_flags(filepath))
         # Get a checker-specific filename, if necessary
         args.append(self.get_filepath(filepath))
-
         return args
 
     def fixup_data(self, _line, data, _filepath):
@@ -440,14 +439,14 @@ class MyPy2Runner(LintRunner):
         '--quick-and-dirty',
     ]
 
-    def _get_cache_dir(self, filename):
+    def _get_cache_dir(self, filepath):
         # type: (str) -> str
         """Find the appropriate .mypy_cache dir for the given branch.
 
         We attempt to place the cache directory in the project root,
         under a subdir corresponding to the branch name.
         """
-        project_root = find_project_root(filename, self.options.venv_root)
+        project_root = find_project_root(filepath, self.options.venv_root)
         branch_top = os.path.join(project_root, '.mypy_cache', 'branches')
         # It doesn't make sense to get a branch name unless we actually found a
         # VCS root (i.e. a virtualenv match isn't enough)
@@ -498,7 +497,6 @@ class MyPy2Runner(LintRunner):
         original_filename = os.path.basename(filepath).replace('flycheck_', '')
         if original_filename not in data['filename']:
             return {}
-        # data['filename'] = 'flycheck_' + filename
 
         data['level'] = data['level'].upper()
         if data['level'] == 'NOTE':
