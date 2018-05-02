@@ -125,9 +125,28 @@ class LintRunner(object):
         # type: (str) -> str
         return filepath
 
+    def user_defined_command_line(self, _filepath):
+        # type: (str) -> Optional[List[str]]
+        """Allow users to define their own command-lines for checkers.
+
+        E.g. if there is a company-provided script to run mypy, allow users to
+        use that instead of the mypy executable directly.
+        """
+        # TODO: support parameterization ("%f" placeholder for filenames, etc.)
+        command_line_option_name = '{}_command'.format(self.name)
+        if vars(self.options).get(command_line_option_name):
+            # TODO: handle parameterization here
+            return [vars(self.options)[command_line_option_name]]
+        return None
+
     def construct_args(self, filepath):
         # type: (str) -> List[str]
         """Construct the argument list for the parser, suitable for passing to Popen."""
+
+        args = self.user_defined_command_line(filepath)
+        if args:
+            return args
+
         # `env` to use a virtualenv, if found
         args = ['/usr/bin/env', self.command]
         # Get checker arguments

@@ -111,6 +111,10 @@ Note that these are implemented as modifying the values received by
 `argparse` in the `pycheckers.py` script, so running `bin/pycheckers.py
 --help` is a good way to find other options that may be specified.:
 
+* <*checker*\>_command - a customized command for running a given checker. For
+  example, if you work at a company that provides its own driver script/daemon
+  for running `mypy`, give the path to the daemon here as `mypy_command =
+  /usr/local/bin/mypy-daemon`.
 * `max-line-length` - the maximum allowable line-length.  This is a good
   option to place in a project-specific directory if you have a personal
   line length preference set by default via
