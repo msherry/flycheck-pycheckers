@@ -13,15 +13,20 @@ Later improvements by Marc Sherry <msherry@gmail.com>
 
 from __future__ import absolute_import, division, print_function
 
-from argparse import ArgumentParser, ArgumentTypeError
-from functools import partial
 import os
 import re
-from subprocess import call, Popen, PIPE
 import sys
+from argparse import ArgumentParser, ArgumentTypeError
+from csv import DictReader
+from functools import partial
+from subprocess import PIPE, Popen, call
 
-# TODO: Ignore the type of ConfigParser until
+# TODO: Ignore the type of conditional imports until
 # https://github.com/python/mypy/issues/1107 is fixed
+try:
+    from StringIO import StringIO  # type: ignore
+except ImportError:
+    from io import StringIO  # type: ignore
 try:
     from configparser import ConfigParser  # type: ignore
 except ImportError:
@@ -115,14 +120,17 @@ class LintRunner(object):
 
     def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
+        """Called to build up the list of command-line arguments to pass to the checker."""
         return ()
 
     def get_env_vars(self):
         # type: () -> Dict[str, str]
+        """Called to return any environment variables that should be set for the checker."""
         return {}
 
     def get_filepath(self, filepath):
         # type: (str) -> str
+        """Called to manipulate the path to the file being checked, for checkers that need it."""
         return filepath
 
     def user_defined_command_line(self, _filepath):
@@ -155,14 +163,20 @@ class LintRunner(object):
         args.append(self.get_filepath(filepath))
         return args
 
-    def fixup_data(self, _line, data, _filepath):
-        # type: (str, Dict[str, str], str) -> Dict[str, str]
-        return data
-
     def process_output(self, line):
         # type: (str) -> Optional[Dict[str, str]]
+        """Use the matcher to extract fields from the line.
+
+        self.output_matcher can be a function, or a regex that yields named matches."""
+        if callable(self.output_matcher):
+            return self.output_matcher(line)
         m = self.output_matcher.match(line)
         return m.groupdict() if m else None
+
+    def fixup_data(self, _line, data, _filepath):
+        # type: (str, Dict[str, str], str) -> Dict[str, str]
+        """Called to perform any optional cleanups of the parsed data."""
+        return data
 
     def process_returncode(self, _returncode):
         # type: (int) -> bool
@@ -538,6 +552,37 @@ class MyPy3Runner(MyPy2Runner):
         return 'mypy3'
 
 
+class BanditRunner(LintRunner):
+
+    command = 'bandit'
+    got_header = False
+
+    def output_matcher(self, line):  # type: ignore
+        # type: (str) -> Optional[Dict[str, str]]
+        keys = ['filename', 'test_name', 'test_id', 'issue_severity',
+                'issue_confidence', 'issue_text', 'line_number', 'line_range']
+        f = StringIO(line)
+        reader = DictReader(f, fieldnames=keys)
+        res = next(reader)
+        if not self.got_header:
+            # This line was the CSV header, not a real error
+            self.got_header = True
+            return None
+        if res and res.get('test_id'):
+            return {
+                'description': res['issue_text'],
+                'error_number': res['test_id'],
+                'filename': res['filename'],
+                'level': 'WARNING',
+                'line_number': res['line_number'],
+            }
+        return None
+
+    def get_run_flags(self, _filepath):
+        # type: (str) -> Iterable[str]
+        return ['-f', 'csv']
+
+
 RUNNERS = {
     'pyflakes': PyflakesRunner,
     'flake8': Flake8Runner,
@@ -545,8 +590,8 @@ RUNNERS = {
     'pylint': PylintRunner,
     'mypy2': MyPy2Runner,
     'mypy3': MyPy3Runner,
+    'bandit': BanditRunner,
 }
-
 
 def get_options_from_file(file_path):
     # type: (str) -> Dict[str, Any]
