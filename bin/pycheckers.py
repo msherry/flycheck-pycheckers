@@ -142,9 +142,9 @@ class LintRunner(object):
         """
         # TODO: support parameterization ("%f" placeholder for filenames, etc.)
         command_line_option_name = '{}_command'.format(self.name)
-        if vars(self.options).get(command_line_option_name):
+        if hasattr(self.options, command_line_option_name):
             # TODO: handle parameterization here
-            return [vars(self.options)[command_line_option_name]]
+            return getattr(self.options, command_line_option_name)
         return None
 
     def construct_args(self, filepath):
