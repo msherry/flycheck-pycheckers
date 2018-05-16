@@ -748,9 +748,9 @@ def get_vcs_branch_name(vcs_root):
     # type: (str) -> Optional[str]
     """If under source control and the VCS supports branches, find branch name.
     """
-    # TODO: only supports git for now
     commands = {
         'git': ['git', 'symbolic-ref', '--short', 'HEAD'],
+        'hg': ['hg', 'branch'],
     }
     vcs_name = find_vcs_name(vcs_root)
     if not vcs_name or vcs_name not in commands:
