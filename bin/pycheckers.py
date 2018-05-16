@@ -103,9 +103,54 @@ class LintRunner(object):
 
     def __init__(self, ignore_codes, enable_codes, options):
         # type: (Tuple[str], Tuple[str], Namespace) -> None
-        self.ignore_codes = set(ignore_codes) if ignore_codes is not None else None
+        self._ignore_codes = set(ignore_codes) if ignore_codes is not None else None
         self.enable_codes = set(enable_codes) if enable_codes is not None else None
         self.options = options
+
+    @property
+    def ignore_codes(self):
+        # type: () -> Optional[Set[str]]
+        """Return a list of error codes to ignore, appropriately scoped to the current linter.
+
+        1. Check for {linter}_ignore_codes, and use that if found
+        2. (experimental) Check for filters on the codes, and apply them as necessary
+
+        Some linters (like Bandit) raise an error if they are passed an error
+        code they do not know about. We allow optionally scoping codes to a set
+        of linters in config files, like so:
+
+        [DEFAULT]
+        extra_ignore_codes = (C0122:-bandit),(B101:bandit)
+        """
+        if self._ignore_codes is None:
+            return None
+
+        # Check for linter-specific ignore code settings first, and just use those if found.
+        ignore_codes_option = '{}_ignore_codes'.format(self.name)
+        if hasattr(self.options, ignore_codes_option):
+            return set(getattr(self.options, ignore_codes_option).split(','))
+
+        # TODO: this is experimental and may disappear. No one uses it yet, so
+        # it's at your own risk.
+        positive_matches = set([self.name, self.command, '+' + self.name, '+' + self.command])
+        negative_matches = set(['-' + self.name, '-' + self.command])
+
+        ret = set()
+        for code_spec in self._ignore_codes:
+            if not code_spec.startswith('('):
+                # Code is applicable to all checkers of concern
+                ret.add(code_spec)
+                continue
+            # Code is restricted somehow
+            code, linters_str = code_spec.split(':')
+            linters = linters_str.split(',')
+            for linter in linters:
+                if linter in positive_matches:
+                    ret.add(code)
+                    break
+                elif linter in negative_matches:
+                    break
+        return ret
 
     @property
     def name(self):
@@ -580,7 +625,12 @@ class BanditRunner(LintRunner):
 
     def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
-        return ['-f', 'csv']
+        flags = ['-f', 'csv']
+        if self.ignore_codes is not None:
+            # NOTE: this doesn't work if the code isn't recognized as a bandit
+            # code (e.g. pylint errors)
+            flags += ['--skip', ','.join(self.ignore_codes)]
+        return flags
 
 
 RUNNERS = {
