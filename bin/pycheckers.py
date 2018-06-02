@@ -593,6 +593,11 @@ class MyPy2Runner(LintRunner):
                     filepath)
             flags += ['--config-file', self.options.mypy_config_file]
 
+        project_root = find_project_root(filepath, self.options.venv_root)
+        mypy_ini_in_vcs_root = os.path.join(project_root, 'mypy.ini')
+        if os.path.exists(mypy_ini_in_vcs_root):
+            flags += ['--config-file', str(mypy_ini_in_vcs_root)]
+
         # Per Guido's suggestion, use the --shadow-file option to work around
         # https://github.com/msherry/flycheck-pycheckers/issues/2, so we can
         # respect per-file mypy.ini config options
