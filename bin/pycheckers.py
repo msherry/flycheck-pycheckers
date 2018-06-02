@@ -331,16 +331,18 @@ class PyflakesRunner(LintRunner):
     @classmethod
     def fixup_data(cls, _line, data, _filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
-        if 'imported but unused' in data['description']:
-            data['level'] = 'WARNING'
-        elif 'redefinition of unused' in data['description']:
-            data['level'] = 'WARNING'
-        elif 'assigned to but never used' in data['description']:
-            data['level'] = 'WARNING'
-        elif 'unable to detect undefined names' in data['description']:
-            data['level'] = 'WARNING'
-        else:
-            data['level'] = 'ERROR'
+        WARNINGS = [
+            'imported but unused',
+            'redefinition of unused',
+            'assigned to but never used',
+            'unable to detect undefined names',
+        ]
+        # Default to 'ERROR' unless a known warning string is found
+        data['level'] = 'ERROR'
+        for warn_str in WARNINGS:
+            if warn_str in data['description']:
+                data['level'] = 'WARNING'
+                break
         data['error_type'] = 'PY'
         data['error_number'] = 'F'
 
