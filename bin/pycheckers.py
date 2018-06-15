@@ -549,14 +549,13 @@ class MyPy2Runner(LintRunner):
         '--quick-and-dirty',
     ]
 
-    def _get_cache_dir(self, filepath):
+    def _get_cache_dir(self, project_root):
         # type: (str) -> str
         """Find the appropriate .mypy_cache dir for the given branch.
 
         We attempt to place the cache directory in the project root,
         under a subdir corresponding to the branch name.
         """
-        project_root = find_project_root(filepath, self.options.venv_root)
         branch_top = os.path.join(project_root, '.mypy_cache', 'branches')
         # It doesn't make sense to get a branch name unless we actually found a
         # VCS root (i.e. a virtualenv match isn't enough)
@@ -580,8 +579,9 @@ class MyPy2Runner(LintRunner):
         # legitimately contains this string
         original_filepath = filepath.replace('flycheck_', '')
 
+        project_root = find_project_root(filepath, self.options.venv_root)
         flags += [
-            '--cache-dir={}'.format(self._get_cache_dir(filepath)),
+            '--cache-dir={}'.format(self._get_cache_dir(project_root)),
         ]
         if self.name == 'mypy':
             # mypy2 mode
@@ -593,7 +593,6 @@ class MyPy2Runner(LintRunner):
                     filepath)
             flags += ['--config-file', self.options.mypy_config_file]
 
-        project_root = find_project_root(filepath, self.options.venv_root)
         mypy_ini_in_vcs_root = os.path.join(project_root, 'mypy.ini')
         if os.path.exists(mypy_ini_in_vcs_root):
             flags += ['--config-file', str(mypy_ini_in_vcs_root)]
