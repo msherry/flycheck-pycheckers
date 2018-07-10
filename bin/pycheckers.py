@@ -594,6 +594,7 @@ class MyPy2Runner(LintRunner):
         original_filename = os.path.basename(filepath).replace('flycheck_', '')
         if original_filename not in data['filename']:
             return {}
+        data['filename'] = os.path.basename(original_filename)
 
         data['level'] = data['level'].upper()
         if data['level'] == 'NOTE':
