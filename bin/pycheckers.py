@@ -162,7 +162,7 @@ class LintRunner(object):
                            'B320', 'B321', 'B322', 'B401', 'B402', 'B403', 'B404', 'B405',
                            'B406', 'B407', 'B408', 'B409', 'B410', 'B411', 'B412', 'B501',
                            'B502', 'B503', 'B504', 'B505', 'B506', 'B601', 'B602', 'B603',
-                           'B604', 'B605', 'B606', 'B607', 'B608', 'B609', 'B701', 'B702',]),
+                           'B604', 'B605', 'B606', 'B607', 'B608', 'B609', 'B701', 'B702', ]),
         }
 
         if self.name in CHECKER_ACCEPTABLE_CODES:
@@ -488,6 +488,10 @@ class PylintRunner(LintRunner):
 
         if data.get('symbol'):
             data['description'] += '  ("{}")'.format(data['symbol'])
+
+        # Pylint column numbers are off by one
+        if data.get('column_number') is not None:
+            data['column_number'] = str(int(data['column_number']) + 1)
         return data
 
     def get_run_flags(self, _filepath):
@@ -662,6 +666,7 @@ RUNNERS = {
     'mypy3': MyPy3Runner,
     'bandit': BanditRunner,
 }
+
 
 def get_options_from_file(file_path):
     # type: (str) -> Dict[str, Any]
