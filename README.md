@@ -110,7 +110,7 @@ overridden in a specific subdirectory.
 Variables that can be set in the configuration file include the following.
 Note that these are implemented as modifying the values received by
 `argparse` in the `pycheckers.py` script, so running `bin/pycheckers.py
---help` is a good way to find other options that may be specified.:
+--help` is a good way to find other options that may be specified.
 
 * <*checker*\>_command - a customized command for running a given checker. For
   example, if you work at a company that provides its own driver script/daemon
@@ -138,6 +138,8 @@ Note that these are implemented as modifying the values received by
   for pylint
 * `mypy_config_file` - the location of a project-specific configuration file
   for mypy
+* `flake8_config_file` - the location of a project-specific configuration file
+  for flake8
 
 
 ---

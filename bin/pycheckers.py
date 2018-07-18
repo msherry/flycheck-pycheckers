@@ -410,6 +410,15 @@ class Flake8Runner(LintRunner):
             # We're explicitly ignoring something, even if that something is
             # nothing (i.e. `--ignore=`, meaning ignore nothing)
             args.append('--ignore=' + ','.join(self.ignore_codes))
+
+        config_file = getattr(self.options, 'flake8_config_file', None)
+        if config_file:
+            if not os.path.exists(config_file):
+                raise FatalException(
+                    "Can't find flake8 config file %s" % config_file,
+                    _filepath)
+            args += ['--config', config_file]
+
         args += [
             # TODO: --select, but additive
             # '-select=' + ','.join(self.enable_codes),
@@ -880,6 +889,9 @@ def parse_args():
     parser.add_argument('--mypy-config-file', default=None,
                         dest='mypy_config_file',
                         help='Location of a config file for mypy')
+    parser.add_argument('--flake8-config-file', default=None,
+                        dest='flake8_config_file',
+                        help='Location of a config file for flake8')
     parser.add_argument('--report-checker-errors-inline', type=str2bool, default=True,
                         action='store',
                         help=("Whether to fake failing checkers's STDERR as a reported "
