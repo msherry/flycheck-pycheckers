@@ -35,7 +35,7 @@ sequentially.
 Installation via MELPA is easiest:
 
 ```elisp
-M-x install-package flycheck-pycheckers
+M-x package-install <RET> flycheck-pycheckers <RET>
 ```
 
 Then, in your `init.el`:
