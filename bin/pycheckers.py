@@ -574,11 +574,13 @@ class MyPy2Runner(LintRunner):
         # type: (str) -> Iterable[str]
         """Determine which mypy (2 or 3) to run, find the cache dir and config file"""
 
+        flags = self._base_flags
+
         # TODO: this is a hack, we should clean this up in case the file
         # legitimately contains this string
         original_filepath = filepath.replace('flycheck_', '')
 
-        flags = self._base_flags + [
+        flags += [
             '--cache-dir={}'.format(self._get_cache_dir(filepath)),
         ]
         if self.name == 'mypy':
