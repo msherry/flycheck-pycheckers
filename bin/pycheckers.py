@@ -56,6 +56,12 @@ class FatalException(Exception):
         return 'ERROR :pycheckers:{msg} at {filename} line 1.'.format(
             msg=self.msg, filename=self.filename)
 
+class Pipenv(object):
+    """Object to confgirue a pipenv for a LintRunner."""
+    def __init__(self, venv, project_dir):
+        self.venv = venv
+        self.project_dir = project_dir
+        self.venv_bin = os.path.join(venv, 'bin')
 
 def is_true(v):
     # type: (str) -> bool
@@ -101,11 +107,12 @@ class LintRunner(object):
 
     command = ''
 
-    def __init__(self, ignore_codes, enable_codes, options):
-        # type: (Tuple[str], Tuple[str], Namespace) -> None
+    def __init__(self, ignore_codes, enable_codes, options, pipenv):
+        # type: (Tuple[str], Tuple[str], Namespace, Optional[Pipenv]) -> None
         self._ignore_codes = set(ignore_codes) if ignore_codes is not None else None
         self.enable_codes = set(enable_codes) if enable_codes is not None else None
         self.options = options
+        self.pipenv = pipenv
 
     @property
     def ignore_codes(self):
@@ -217,13 +224,25 @@ class LintRunner(object):
         if args:
             return args
 
-        # `env` to use a virtualenv, if found
-        args = ['/usr/bin/env', self.command]
+        if self.pipenv:
+            args = ['pipenv', 'run', self.command]
+        else:
+            # `env` to use a virtualenv, if found
+            args = ['/usr/bin/env', self.command]
+
         # Get checker arguments
         args.extend(self.get_run_flags(filepath))
         # Get a checker-specific filename, if necessary
         args.append(self.get_filepath(filepath))
         return args
+
+    def run_dir(self, _filepath):
+        # type: (str) -> Optional[str]
+        """Retuns the directory to run the command in."""
+        if self.pipenv:
+            return self.pipenv.project_dir
+        else:
+            return None
 
     def process_output(self, line):
         # type: (str) -> Optional[Dict[str, str]]
@@ -290,7 +309,8 @@ class LintRunner(object):
 
     def run(self, filepath):
         # type: (str) -> Tuple[int, List[str]]
-        if not self._executable_exists():
+
+        if not self.pipenv and not self._executable_exists():
             # Return a parseable error message so the normal parsing mechanism
             # can display it
             return 1, [
@@ -299,11 +319,13 @@ class LintRunner(object):
                      self.command, filepath))]
 
         args = self.construct_args(filepath)
+        run_dir = self.run_dir(filepath)
 
         try:
             process = Popen(
                 args, stdout=PIPE, stderr=PIPE, universal_newlines=True,
-                env=dict(os.environ, **self.get_env_vars()))
+                env=dict(os.environ, **self.get_env_vars()),
+                cwd=run_dir)
         except Exception as e:                   # pylint: disable=broad-except
             print(e, args)
             return 1, [str(e)]
@@ -747,10 +769,10 @@ def update_options_locally(options):
     return options
 
 
-def run_one_checker(ignore_codes, enable_codes, options, source_file_path, checker_name):
-    # type: (Tuple[str], Tuple[str], Namespace, str, str) -> Tuple[int, List[str]]
+def run_one_checker(ignore_codes, enable_codes, options, pipenv, source_file_path, checker_name):
+    # type: (Tuple[str], Tuple[str], Namespace, Optional[Pipenv], str, str) -> Tuple[int, List[str]]
     checker_class = RUNNERS[checker_name]
-    runner = checker_class(ignore_codes, enable_codes, options)
+    runner = checker_class(ignore_codes, enable_codes, options, pipenv)
     errors_or_warnings, out_lines = runner.run(source_file_path)
     return (errors_or_warnings, out_lines)
 
@@ -802,20 +824,36 @@ def get_vcs_branch_name(vcs_root):
     return out if out else None
 
 
-def find_pipenv_venv(source_file):
-    # type: (str) -> Optional[str]
-    """Return venv dir if pipenv in affect for source file."""        
+def find_pipenv(source_file):
+    # type: (str, Namespace) -> Optional[Pipenv]
+    """Return Pipenv if pipenv in affect for source file."""
     args = ['pipenv', '--venv']
     try:
-        process = Popen( args, stdout=PIPE, stderr=PIPE,
-                         env=dict(os.environ),
-                         cwd=os.path.dirname(source_file))
+        process = Popen(args, stdout=PIPE, stderr=PIPE,
+                        env=dict(os.environ),
+                        cwd=os.path.dirname(source_file))
     except Exception as e:
         print(e)
         return None
-        
+
     venv, _err = process.communicate()
-    return venv.strip()
+
+    args = ['pipenv', '--where']
+    try:
+        process = Popen(args, stdout=PIPE, stderr=PIPE,
+                        env=dict(os.environ),
+                        cwd=os.path.dirname(source_file))
+    except Exception as e:
+        print(e)
+        return None
+    project_dir, _err = process.communicate()
+
+    venv = venv.strip()
+    project_dir = project_dir.strip()
+    if venv and project_dir:
+        return Pipenv(venv, project_dir)
+    else:
+        return None
 
 
 def guess_virtualenv(source_file, venv_root):
@@ -840,16 +878,6 @@ def guess_virtualenv(source_file, venv_root):
     return None, None
 
 
-def set_path_for_pipenv(source_file):
-    # type: (str) -> None
-    """Determin if the curent file is in a pipenv, and munge paths
-    appropriately"""
-    pipenv = find_pipenv_venv(source_file)
-    if pipenv :
-        print( 'munging path with found PIPENV at ' + pipenv )
-        bin_path = os.path.join(pipenv, 'bin')
-        os.environ['PATH'] = bin_path + ':' + os.environ['PATH']
-    
 def set_path_for_virtualenv(source_file, venv_root):
     # type: (str, str) -> None
     """Determine if the current file is part of a package that has a
@@ -945,13 +973,14 @@ def main():
 
     options = update_options_locally(options)
 
+    pipenv = find_pipenv(source_file_path)
+
     checkers = options.checkers
     ignore_codes = (tuple(c.strip() for c in options.ignore_codes.split(",") if c)
                     if options.ignore_codes is not None else None)
     enable_codes = tuple(c.strip() for c in options.enable_codes.split(",") if c)
     set_path_for_virtualenv(source_file_path, options.venv_root)
-    set_path_for_pipenv( source_file_path )
-    
+
     checker_names = [checker.strip() for checker in checkers.split(',')]
     try:
         [RUNNERS[checker_name] for checker_name in checker_names]
@@ -959,13 +988,14 @@ def main():
         croak(("Unknown checker {}".format(checker_name),  # pylint: disable=used-before-assignment
                "Expected one of %s" % ', '.join(RUNNERS.keys())),
               filename=options.file)
-
+    
+    
     if options.multi_thread:
         from multiprocessing import Pool, cpu_count
         p = Pool(cpu_count() + 1)
 
         func = partial(
-            run_one_checker, ignore_codes, enable_codes, options, source_file_path)
+            run_one_checker, ignore_codes, enable_codes, options, pipenv, source_file_path)
 
         outputs = p.map(func, checker_names)
         p.close()
@@ -977,7 +1007,7 @@ def main():
         out_lines_list = []
         for checker_name in checker_names:
             e_or_w, o_l = run_one_checker(
-                ignore_codes, enable_codes, options, source_file_path, checker_name)
+                ignore_codes, enable_codes, options, pipenv, source_file_path, checker_name)
             errors_or_warnings += e_or_w
             out_lines_list.append(o_l)
 
