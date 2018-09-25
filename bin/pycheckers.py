@@ -802,6 +802,22 @@ def get_vcs_branch_name(vcs_root):
     return out if out else None
 
 
+def find_pipenv_venv(source_file):
+    # type: (str) -> Optional[str]
+    """Return venv dir if pipenv in affect for source file."""        
+    args = ['pipenv', '--venv']
+    try:
+        process = Popen( args, stdout=PIPE, stderr=PIPE,
+                         env=dict(os.environ),
+                         cwd=os.path.dirname(source_file))
+    except Exception as e:
+        print(e)
+        return None
+        
+    venv, _err = process.communicate()
+    return venv.strip()
+
+
 def guess_virtualenv(source_file, venv_root):
     # type: (str, str) -> Tuple[Optional[str], Optional[str]]
     """Return the paths to the project root and the virtualenv that
@@ -824,6 +840,16 @@ def guess_virtualenv(source_file, venv_root):
     return None, None
 
 
+def set_path_for_pipenv(source_file):
+    # type: (str) -> None
+    """Determin if the curent file is in a pipenv, and munge paths
+    appropriately"""
+    pipenv = find_pipenv_venv(source_file)
+    if pipenv :
+        print( 'munging path with found PIPENV at ' + pipenv )
+        bin_path = os.path.join(pipenv, 'bin')
+        os.environ['PATH'] = bin_path + ':' + os.environ['PATH']
+    
 def set_path_for_virtualenv(source_file, venv_root):
     # type: (str, str) -> None
     """Determine if the current file is part of a package that has a
@@ -831,6 +857,7 @@ def set_path_for_virtualenv(source_file, venv_root):
 
     _project_root, venv_path = guess_virtualenv(source_file, venv_root)
     if venv_path:
+        print( 'munging path with found VENV at ' + venv_path )
         bin_path = os.path.join(venv_path, 'bin')
         os.environ['PATH'] = bin_path + ':' + os.environ['PATH']
 
@@ -923,7 +950,8 @@ def main():
                     if options.ignore_codes is not None else None)
     enable_codes = tuple(c.strip() for c in options.enable_codes.split(",") if c)
     set_path_for_virtualenv(source_file_path, options.venv_root)
-
+    set_path_for_pipenv( source_file_path )
+    
     checker_names = [checker.strip() for checker in checkers.split(',')]
     try:
         [RUNNERS[checker_name] for checker_name in checker_names]
