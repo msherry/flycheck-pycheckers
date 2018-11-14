@@ -19,6 +19,7 @@ import sys
 from argparse import ArgumentParser, ArgumentTypeError
 from csv import DictReader
 from functools import partial
+import shlex
 from subprocess import PIPE, Popen, call
 
 # TODO: Ignore the type of conditional imports until
@@ -206,7 +207,7 @@ class LintRunner(object):
         command_line_option_name = '{}_command'.format(self.name)
         if hasattr(self.options, command_line_option_name):
             # TODO: handle parameterization here
-            return getattr(self.options, command_line_option_name)
+            return shlex.split(getattr(self.options, command_line_option_name))
         return None
 
     def construct_args(self, filepath):
@@ -541,6 +542,7 @@ class MyPy2Runner(LintRunner):
     output_matcher = re.compile(
         r'(?P<filename>[^:]+):'
         r'(?P<line_number>[^:]+):'
+        r'((?P<column_number>[^:]+):)?'  # Column number is optional, depending on mypy version
         r' (?P<level>[^:]+):'
         r' (?P<description>.+)$')
 
