@@ -810,8 +810,9 @@ def get_vcs_branch_name(vcs_root):
 
 def guess_virtualenv(source_file, venv_root):
     # type: (str, str) -> Tuple[Optional[str], Optional[str]]
-    """Return the paths to the project root and the virtualenv that
-    corresponds to this source file, if any.
+    """Given the virtualenvwrapper base directory, attempt to guess the paths to
+    the project root and the virtualenv that corresponds to this source file,
+    based on the project and virtualenv names.
 
     The virtualenv name must match the name of one of the containing
     directories.
@@ -830,12 +831,14 @@ def guess_virtualenv(source_file, venv_root):
     return None, None
 
 
-def set_path_for_virtualenv(source_file, venv_root):
-    # type: (str, str) -> None
+def set_path_for_virtualenv(source_file, venv_path, venv_root):
+    # type: (str, Optional[str], str) -> None
     """Determine if the current file is part of a package that has a
     virtualenv, and munge paths appropriately"""
 
-    _project_root, venv_path = guess_virtualenv(source_file, venv_root)
+    if not venv_path:
+        # If the venv path isn't supplied directly, try to guess it
+        _project_root, venv_path = guess_virtualenv(source_file, venv_root)
     if venv_path:
         bin_path = os.path.join(venv_path, 'bin')
         os.environ['PATH'] = bin_path + ':' + os.environ['PATH']
@@ -890,7 +893,12 @@ def parse_args():
                               'rather than simultaneously'))
     parser.add_argument('--venv-root', dest='venv_root',
                         default='~/.virtualenvs', action='store',
-                        help='Location of Python virtual environments')
+                        help=('Location of all Python virtual environments. '
+                              'Used with auto-detecting virtual envs created by virtualenvwrapper'))
+    parser.add_argument('--venv-path', dest='venv_path',
+                        default=None, action='store',
+                        help=('The full path to a virtualenv. Used with a directly-created '
+                              '(not using virtualenvwrapper) virtualenv.'))
     parser.add_argument('--pylint-rcfile', default=None,
                         dest='pylint_rcfile',
                         help='Location of a config file for pylint')
@@ -928,7 +936,7 @@ def main():
     ignore_codes = (tuple(c.strip() for c in options.ignore_codes.split(",") if c)
                     if options.ignore_codes is not None else None)
     enable_codes = tuple(c.strip() for c in options.enable_codes.split(",") if c)
-    set_path_for_virtualenv(source_file_path, options.venv_root)
+    set_path_for_virtualenv(source_file_path, options.venv_path, options.venv_root)
 
     checker_names = [checker.strip() for checker in checkers.split(',')]
     try:
