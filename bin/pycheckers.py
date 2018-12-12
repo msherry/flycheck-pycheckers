@@ -328,7 +328,7 @@ class LintRunner(object):
 
 
 class PyflakesRunner(LintRunner):
-    """Run pyflakes, producing flymake readable output.
+    """Run pyflakes, producing flycheck readable output.
 
     The raw output looks like:
       tests/test_richtypes.py:4: 'doom' imported but unused
@@ -429,7 +429,7 @@ class Flake8Runner(LintRunner):
 
 
 class Pep8Runner(LintRunner):
-    """Run pep8.py, producing flymake readable output.
+    """Run pep8.py, producing flycheck readable output.
 
     The raw output looks like:
       spiders/structs.py:3:80: E501 line too long (80 characters)
@@ -469,7 +469,7 @@ class Pep8Runner(LintRunner):
 
 
 class PylintRunner(LintRunner):
-    """ Run pylint, producing flymake readable output.
+    """ Run pylint, producing flycheck readable output.
 
     The raw output looks like:
     render.py:49: [C0301] Line too long (82/80)
@@ -542,7 +542,7 @@ class MyPy2Runner(LintRunner):
     output_matcher = re.compile(
         r'(?P<filename>[^:]+):'
         r'(?P<line_number>[^:]+):'
-        r'((?P<column_number>[^:]+):)?'  # Column number is optional, depending on mypy version
+        r'((?P<column_number>[^:]+):)?'  # Column number is optional, depending on mypy options
         r' (?P<level>[^:]+):'
         r' (?P<description>.+)$')
 
