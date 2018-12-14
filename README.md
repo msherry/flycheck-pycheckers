@@ -32,6 +32,19 @@ if they want to run both flake8 and pylint, that's fine.
 This also allows us to run multiple syntax checkers in parallel, rather than
 sequentially.
 
+During migration from Python2 to Python2+3 or Python3, it might be
+relevant to check files in the same directory/project with different
+checkers, without using different config files. Therefore pycheckers
+can detect which tools to use. This is active if `py23_autodetect` is set.
+The py2/3 autodetection rule is:
+* If a comment line: `# py:<version>` is found, then:
+** python2 compatible specified CHECKERS are used if <version> includes 2
+** python3 compatible specified CHECKERS are used if <version> includes 3
+** E.g. `# py:23` gives that all specified CHECKERS are used
+* Elif python3 is found in first line => python3 compatible specified CHECKERS are used
+* Elif python or python2 is found in first line => python2 compatible specified CHECKERS are used
+* Else all specified CHECKERS are used
+
 ## Quick start
 
 Installation via MELPA is easiest:
@@ -142,6 +155,7 @@ Note that these are implemented as modifying the values received by
   for mypy
 * `flake8_config_file` - the location of a project-specific configuration file
   for flake8
+* `py23_autodetect` - Autodetect python2 and/or python3
 
 
 ---
