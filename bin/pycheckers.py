@@ -603,7 +603,7 @@ class MyPy2Runner(LintRunner):
         # https://github.com/msherry/flycheck-pycheckers/issues/2, so we can
         # respect per-file mypy.ini config options
         # TODO: only do this when being run by flycheck?
-        flags += ['--shadow-file', filepath, original_filepath]
+        flags += ['--shadow-file', original_filepath, filepath]
         return flags
 
     def fixup_data(self, _line, data, filepath):
