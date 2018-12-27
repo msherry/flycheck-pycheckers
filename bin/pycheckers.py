@@ -37,7 +37,7 @@ try:
     # pylint: disable=unused-import, ungrouped-imports
     from argparse import Namespace
     from typing import (
-        Any, Dict, List, IO, Iterable, Optional, Set, Tuple)
+        Any, Dict, List, IO, Iterable, Optional, Set, Tuple, Union)
 except ImportError:
     pass
 
@@ -107,6 +107,11 @@ class LintRunner(object):
         self._ignore_codes = set(ignore_codes) if ignore_codes is not None else None
         self.enable_codes = set(enable_codes) if enable_codes is not None else None
         self.options = options
+
+        # The path to the file being checked
+        self._filepath = None             # type: Optional[str]
+        # The root directory of the current project
+        self._project_root = None         # type: Optional[str]
 
     @property
     def ignore_codes(self):
@@ -195,6 +200,69 @@ class LintRunner(object):
         # type: (str) -> str
         """Called to manipulate the path to the file being checked, for checkers that need it."""
         return filepath
+
+    def find_project_root(self, filepath):
+        # type: (str) -> str
+        """Returns the root of the project that filepath belongs to.
+
+        Attempts to cache lookups to avoid doing extra work."""
+        if not self._project_root:
+            self._project_root = self._find_project_root(filepath, self.options.venv_root)
+        return self._project_root
+
+    def _find_project_root(self, source_file, venv_root):
+        # type: (str, str) -> str
+        """Find the root directory of the current project.
+
+        1. Walk up the directory tree looking for a VCS directory.
+        2. Failing that, find a virtualenv that matches a part of the
+               directory, and choose that as the root.
+        3. Otherwise, just use the local directory.
+        """
+        # Case 1
+        vcs_root, _vcs_name = find_vcs_root(source_file)
+        if vcs_root:
+            return vcs_root
+
+        # Case 2
+        project_dir, _venv_path = guess_virtualenv(source_file, venv_root)
+        if project_dir:
+            return project_dir
+
+        # Case 3
+        return os.path.dirname(source_file)
+
+    def find_file_in_project_root(self, filename):
+        # type: (str) -> Optional[str]
+        """Check if `filename` (generally a config file) exists in project
+        root, and return the full path if so. Otherwise, return None.
+        """
+        if not self._filepath:            # This should be set by now
+            raise ValueError("self._filepath not set, can't determine project root")
+        project_root = self.find_project_root(self._filepath)
+
+        file_path = os.path.join(project_root, filename)
+        if os.path.exists(file_path):
+            return file_path
+        return None
+
+    def find_config_file(self, option_name, config_file_name):
+        # type: (str, str) -> Optional[str]
+        """Attempt to find a config file -- either specified via the
+        given option_name, or by looking in the project root for a given
+        default filename. Return a path to the file if present, otherwise
+        None.
+        """
+        config_file = getattr(self.options, option_name, None)
+        if config_file:
+            if not os.path.exists(config_file):
+                raise FatalException(
+                    "Can't find config file %s for checker %s" % (config_file, self.name),
+                    self._filepath)
+        else:
+            # Attempt to find file `config_file_name` in the project root
+            config_file = self.find_file_in_project_root(config_file_name)
+        return config_file
 
     def user_defined_command_line(self, _filepath):
         # type: (str) -> Optional[List[str]]
@@ -291,6 +359,12 @@ class LintRunner(object):
 
     def run(self, filepath):
         # type: (str) -> Tuple[int, List[str]]
+        """The main entry point to a LintRunner.
+
+        Accepts a path to a file to be checked with the given linter,
+        and returns a tuple containing the count of error/warning lines,
+        and a list of said lines.
+        """
         if not self._executable_exists():
             # Return a parseable error message so the normal parsing mechanism
             # can display it
@@ -298,6 +372,10 @@ class LintRunner(object):
                 ('ERROR : {}:Checker not found on PATH, '
                  'unable to check at {} line 1.'.format(
                      self.command, filepath))]
+
+        # Save the path to the file being checked so we don't have to pass it everywhere.
+        # TODO: This means we're carrying state around, double-check that we're ok with this.
+        self._filepath = filepath
 
         args = self.construct_args(filepath)
 
@@ -412,12 +490,8 @@ class Flake8Runner(LintRunner):
             # nothing (i.e. `--ignore=`, meaning ignore nothing)
             args.append('--ignore=' + ','.join(self.ignore_codes))
 
-        config_file = getattr(self.options, 'flake8_config_file', None)
+        config_file = self.find_config_file('flake8_config_file', '.flake8')
         if config_file:
-            if not os.path.exists(config_file):
-                raise FatalException(
-                    "Can't find flake8 config file %s" % config_file,
-                    _filepath)
             args += ['--config', config_file]
 
         args += [
@@ -581,23 +655,17 @@ class MyPy2Runner(LintRunner):
         # legitimately contains this string
         original_filepath = filepath.replace('flycheck_', '')
 
-        project_root = find_project_root(filepath, self.options.venv_root)
+        project_root = self.find_project_root(filepath)
         flags += [
             '--cache-dir={}'.format(self._get_cache_dir(project_root)),
         ]
         if self.name == 'mypy':
             # mypy2 mode
             flags += ['--py2']
-        if getattr(self.options, 'mypy_config_file', None):
-            if not os.path.exists(self.options.mypy_config_file):
-                raise FatalException(
-                    "Can't find mypy config file %s" % self.options.mypy_config_file,
-                    filepath)
-            flags += ['--config-file', self.options.mypy_config_file]
-        else:
-            mypy_ini_in_vcs_root = os.path.join(project_root, 'mypy.ini')
-            if os.path.exists(mypy_ini_in_vcs_root):
-                flags += ['--config-file', str(mypy_ini_in_vcs_root)]
+
+        config_file = self.find_config_file('mypy_config_file', 'mypy.ini')
+        if config_file:
+            flags += ['--config-file', config_file]
 
         # Per Guido's suggestion, use the --shadow-file option to work around
         # https://github.com/msherry/flycheck-pycheckers/issues/2, so we can
@@ -688,17 +756,19 @@ RUNNERS = {
 def get_options_from_file(file_path):
     # type: (str) -> Dict[str, Any]
     """Parse options from the config file at `file_path` and return them as a dict"""
-    parsed_options = {}         # type: Dict[str, Any]
+    parsed_options = {}         # type: Dict[str, Union[str, bool]]
 
     config = ConfigParser()
     config.read(file_path)
     # [DEFAULT] section
     for key, value in config.defaults().items():
         if is_false(value):
-            value = False
+            final_value = False           # type: Union[str, bool]
         elif is_true(value):
-            value = True
-        parsed_options[key] = value
+            final_value = True
+        else:
+            final_value = value
+        parsed_options[key] = final_value
     # NOTE: removed support for per-file config file sections, as I don't think
     # they were being used.
     return parsed_options
@@ -842,29 +912,6 @@ def set_path_for_virtualenv(source_file, venv_path, venv_root):
     if venv_path:
         bin_path = os.path.join(venv_path, 'bin')
         os.environ['PATH'] = bin_path + ':' + os.environ['PATH']
-
-
-def find_project_root(source_file, venv_root):
-    # type: (str, str) -> str
-    """Find the root directory of the current project.
-
-    1. Walk up the directory tree looking for a VCS directory.
-    2. Failing that, find a virtualenv that matches a part of the
-           directory, and choose that as the root.
-    3. Otherwise, just use the local directory.
-    """
-    # Case 1
-    vcs_root, _vcs_name = find_vcs_root(source_file)
-    if vcs_root:
-        return vcs_root
-
-    # Case 2
-    project_dir, _venv_path = guess_virtualenv(source_file, venv_root)
-    if project_dir:
-        return project_dir
-
-    # Case 3
-    return os.path.dirname(source_file)
 
 
 def parse_args():
