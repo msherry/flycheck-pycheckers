@@ -18,6 +18,7 @@ import re
 import sys
 from argparse import ArgumentParser, ArgumentTypeError
 from csv import DictReader
+from distutils.version import LooseVersion
 from functools import partial
 import shlex
 from subprocess import PIPE, Popen, call
@@ -101,6 +102,10 @@ class LintRunner(object):
     output_matcher = re.compile(r'')
 
     command = ''
+
+    version_args = ('--version',)
+
+    version_matcher = re.compile(r'')
 
     def __init__(self, ignore_codes, enable_codes, options):
         # type: (Tuple[str], Tuple[str], Namespace) -> None
@@ -297,6 +302,16 @@ class LintRunner(object):
         args.append(self.get_filepath(filepath))
         return args
 
+    def construct_version_args(self):
+        # type: () -> List[str]
+        """Construct the argument list for finding the parser's version, suitable for passing to Popen."""
+
+        # `env` to use a virtualenv, if found
+        args = ['/usr/bin/env', self.command]
+        # Get checker arguments
+        args.extend(self.version_args)
+        return args
+
     def process_output(self, line):
         # type: (str) -> Optional[Dict[str, str]]
         """Use the matcher to extract fields from the line.
@@ -407,6 +422,25 @@ class LintRunner(object):
 
         return errors_or_warnings, out_lines
 
+    def get_version(self):
+        # type: () -> Optional[str]
+        """Run the command with a '-V' flag or similar, parse the output, and
+        return a version number as a string.
+        """
+        args = self.construct_version_args()
+        try:
+            process = Popen(
+                args, stdout=PIPE, stderr=PIPE, universal_newlines=True,
+                env=dict(os.environ, **self.get_env_vars()))
+        except Exception as e:                   # pylint: disable=broad-except
+            print(e, args)
+            return None
+
+        out, _err = process.communicate()
+        process.wait()
+        version = self.version_matcher.match(out)
+        return version.groupdict().get('version') if version else None
+
 
 class PyflakesRunner(LintRunner):
     """Run pyflakes, producing flycheck readable output.
@@ -461,6 +495,10 @@ class Flake8Runner(LintRunner):
         '(?P<error_type>[WEFCN])(?P<error_number>[^ ]+) '
         '(?P<description>.+)$')
 
+    version_matcher = re.compile(
+        r'(?P<version>[0-9.]+).*'
+    )
+
     @classmethod
     def fixup_data(cls, _line, data, _filepath):
         # type: (str, Dict[str, str], str) -> Dict[str, str]
@@ -487,11 +525,19 @@ class Flake8Runner(LintRunner):
 
     def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
+        version = self.get_version()
+
         args = []
         if self.ignore_codes is not None:
-            # We're explicitly ignoring something, even if that something is
-            # nothing (i.e. `--ignore=`, meaning ignore nothing)
-            args.append('--ignore=' + ','.join(self.ignore_codes))
+            if LooseVersion(version) >= LooseVersion('3.6.0'):
+                # This only works with flake8 3.6.0+, and *extends*
+                # the values given by a config file.
+                args.append('--extend-ignore=' + ','.join(self.ignore_codes))
+            else:
+                # This *overwrites* any values from a config file.
+                # We're explicitly ignoring something, even if that something is
+                # nothing (i.e. `--ignore=`, meaning ignore nothing)
+                args.append('--ignore=' + ','.join(self.ignore_codes))
 
         config_file = self.find_config_file(
             'flake8_config_file', ['setup.cfg', 'tox.ini', '.flake8'])
@@ -624,9 +670,12 @@ class MyPy2Runner(LintRunner):
         r' (?P<level>[^:]+):'
         r' (?P<description>.+)$')
 
+    version_matcher = re.compile(
+        r'mypy (?P<version>[0-9.]+)'
+    )
+
     _base_flags = [
         '--incremental',
-        '--quick-and-dirty',
     ]
 
     def _get_cache_dir(self, project_root):
@@ -654,6 +703,11 @@ class MyPy2Runner(LintRunner):
         """Determine which mypy (2 or 3) to run, find the cache dir and config file"""
 
         flags = self._base_flags
+
+        version = self.get_version()
+        if LooseVersion(version) < LooseVersion('0.660'):
+            # --quick-and-dirty is still available
+            flags += ['--quick-and-dirty']
 
         # TODO: this is a hack, we should clean this up in case the file
         # legitimately contains this string
