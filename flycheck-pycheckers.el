@@ -275,7 +275,10 @@ per-directory."
      (message) " at " (file-name) " line " line (optional "," column) "." line-end)
     (warning line-start
      "WARNING " (optional (id (one-or-more (not (any ":"))))) ":"
-     (message) " at " (file-name) " line " line (optional "," column) "." line-end))
+     (message) " at " (file-name) " line " line (optional "," column) "." line-end)
+    (info line-start
+     "INFO " (optional (id (one-or-more (not (any ":"))))) ":"
+     (message) " at " (file-name) " line " line "." line-end))
   :modes 'python-mode)
 
 (defun flycheck-pycheckers-unsetup ()

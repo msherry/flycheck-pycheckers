@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function
 import os
 import re
 import sys
+import time
 from argparse import ArgumentParser, ArgumentTypeError
 from csv import DictReader
 from distutils.version import LooseVersion
@@ -117,6 +118,10 @@ class LintRunner(object):
         self._filepath = None             # type: Optional[str]
         # The root directory of the current project
         self._project_root = None         # type: Optional[str]
+        # The version of the checker, if available
+        self._version = None              # type: Optional[LooseVersion]
+        # Any debugging output
+        self._debug_lines = []            # type: List[str]
 
     @property
     def ignore_codes(self):
@@ -190,6 +195,15 @@ class LintRunner(object):
         the command is just 'mypy'.
         """
         return self.command
+
+    @property
+    def version(self):
+        # type: () -> LooseVersion
+        """The version of the current checker."""
+        if not self._version:
+            self._version = LooseVersion(self._get_version() or '0')
+            assert self._version  # make mypy happy
+        return self._version
 
     def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
@@ -383,6 +397,7 @@ class LintRunner(object):
         and returns a tuple containing the count of error/warning lines,
         and a list of said lines.
         """
+        st = time.time()
         if not self._executable_exists():
             # Return a parseable error message so the normal parsing mechanism
             # can display it
@@ -420,9 +435,27 @@ class LintRunner(object):
                     out_lines += ['WARNING : {}:{} at {} line 1.'.format(
                         self.command, line, filepath)]
 
+        et = time.time()
+        self.debug('Start: %.2fs  end: %.2fs  duration: %.2fs' % (st, et, (et-st)))
+
+        if self.options.debug:
+            debug_output = self._get_debug_output()
+            errors_or_warnings += len(debug_output)
+            out_lines += ['INFO : {}:{} at {} line 1.'.format(
+                self.command, line, filepath) for line in debug_output]
+
         return errors_or_warnings, out_lines
 
-    def get_version(self):
+    def debug(self, line):
+        # type: (str) -> None
+        """Add a new line for debugging output"""
+        self._debug_lines.append(line)
+
+    def _get_debug_output(self):
+        # type: () -> List[str]
+        return self._debug_lines
+
+    def _get_version(self):
         # type: () -> Optional[str]
         """Run the command with a '-V' flag or similar, parse the output, and
         return a version number as a string.
@@ -525,11 +558,9 @@ class Flake8Runner(LintRunner):
 
     def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
-        version = self.get_version()
-
         args = []
         if self.ignore_codes is not None:
-            if LooseVersion(version) >= LooseVersion('3.6.0'):
+            if self.version >= LooseVersion('3.6.0'):
                 # This only works with flake8 3.6.0+, and *extends*
                 # the values given by a config file.
                 args.append('--extend-ignore=' + ','.join(self.ignore_codes))
@@ -703,9 +734,7 @@ class MyPy2Runner(LintRunner):
         """Determine which mypy (2 or 3) to run, find the cache dir and config file"""
 
         flags = self._base_flags
-
-        version = self.get_version()
-        if LooseVersion(version) < LooseVersion('0.660'):
+        if self.version < LooseVersion('0.660'):
             # --quick-and-dirty is still available
             flags += ['--quick-and-dirty']
 
@@ -1018,6 +1047,9 @@ def parse_args():
                         help=("Whether to fake failing checkers's STDERR as a reported "
                               "error for easier display."))
 
+    parser.add_argument('--debug', action='store_true',
+                        help=('Enable output to help debug pycheckers itself'))
+
     return parser.parse_args()
 
 
@@ -1058,7 +1090,7 @@ def main():
         func = partial(
             run_one_checker, ignore_codes, enable_codes, options, source_file_path)
 
-        outputs = p.map(func, checker_names)
+        outputs = p.map(func, checker_names, chunksize=1)
         p.close()
         p.join()
         counts, out_lines_list = zip(*outputs)
