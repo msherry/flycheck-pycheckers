@@ -72,7 +72,7 @@ def str2bool(v):
     # type: (str) -> bool
     if is_true(v):
         return True
-    elif is_false(v):
+    if is_false(v):
         return False
     raise ArgumentTypeError('Boolean value expected.')
 
@@ -246,8 +246,8 @@ class LintRunner(object):
             return file_path
         return None
 
-    def find_config_file(self, option_name, config_file_name):
-        # type: (str, str) -> Optional[str]
+    def find_config_file(self, option_name, config_file_names):
+        # type: (str, List[str]) -> Optional[str]
         """Attempt to find a config file -- either specified via the
         given option_name, or by looking in the project root for a given
         default filename. Return a path to the file if present, otherwise
@@ -260,8 +260,11 @@ class LintRunner(object):
                     "Can't find config file %s for checker %s" % (config_file, self.name),
                     self._filepath)
         else:
-            # Attempt to find file `config_file_name` in the project root
-            config_file = self.find_file_in_project_root(config_file_name)
+            # Attempt to find one of the `config_file_names` in the project root
+            for config_file_name in config_file_names:
+                config_file = self.find_file_in_project_root(config_file_name)
+                if config_file:
+                    break
         return config_file
 
     def user_defined_command_line(self, _filepath):
@@ -490,7 +493,8 @@ class Flake8Runner(LintRunner):
             # nothing (i.e. `--ignore=`, meaning ignore nothing)
             args.append('--ignore=' + ','.join(self.ignore_codes))
 
-        config_file = self.find_config_file('flake8_config_file', '.flake8')
+        config_file = self.find_config_file(
+            'flake8_config_file', ['setup.cfg', 'tox.ini', '.flake8'])
         if config_file:
             args += ['--config', config_file]
 
@@ -663,7 +667,7 @@ class MyPy2Runner(LintRunner):
             # mypy2 mode
             flags += ['--py2']
 
-        config_file = self.find_config_file('mypy_config_file', 'mypy.ini')
+        config_file = self.find_config_file('mypy_config_file', ['mypy.ini'])
         if config_file:
             flags += ['--config-file', config_file]
 
