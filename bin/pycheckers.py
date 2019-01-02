@@ -525,7 +525,7 @@ class Flake8Runner(LintRunner):
         r'(?P<filename>[^:]+):'
         '(?P<line_number>[^:]+):'
         '(?P<column_number>[^:]+): '
-        '(?P<error_type>[WEFCN])(?P<error_number>[^ ]+) '
+        '(?P<error_type>[WEFCNI])(?P<error_number>[^ ]+) '
         '(?P<description>.+)$')
 
     version_matcher = re.compile(
