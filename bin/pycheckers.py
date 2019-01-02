@@ -575,11 +575,13 @@ class Flake8Runner(LintRunner):
         if config_file:
             args += ['--config', config_file]
 
-        args += [
-            # TODO: --select, but additive
-            # '-select=' + ','.join(self.enable_codes),
-            '--max-line-length', str(self.options.max_line_length),
-        ]
+        # TODO: --select, but additive
+        # '-select=' + ','.join(self.enable_codes),
+
+        if self.options.max_line_length is not None:
+            args += [
+                '--max-line-length', str(self.options.max_line_length),
+            ]
         return args
 
 
@@ -614,11 +616,14 @@ class Pep8Runner(LintRunner):
         args = []
         if self.ignore_codes is not None:
             args.append('--ignore=' + ','.join(self.ignore_codes))
+        if self.options.max_line_length is not None:
+            args += [
+                '--max-line-length', str(self.options.max_line_length),
+            ]
         args += [
             '--repeat',
             # TODO: make this additive, not a replacement
             # '--select=' + ','.join(self.enable_codes),
-            '--max-line-length', str(self.options.max_line_length),
         ]
         return args
 
@@ -664,6 +669,10 @@ class PylintRunner(LintRunner):
         args = []
         if self.ignore_codes is not None:
             args.append('--disable=' + ','.join(self.ignore_codes))
+        if self.options.max_line_length is not None:
+            args += [
+                '--max-line-length', str(self.options.max_line_length),
+            ]
         args += [
             '--msg-template', ('{path}:{line}:{column}: '
                                '[{msg_id}({symbol})] {msg}'),
@@ -671,7 +680,6 @@ class PylintRunner(LintRunner):
             # This is additive, not replacing
             '--enable=' + ','.join(self.enable_codes),
             '--dummy-variables-rgx=' + '_.*',
-            '--max-line-length', str(self.options.max_line_length),
         ]
         if self.options.pylint_rcfile:
             args.extend(['--rcfile', self.options.pylint_rcfile])
@@ -1015,8 +1023,7 @@ def parse_args():
                         default='',
                         help="Comma-separated list of error codes to ignore")
     parser.add_argument('--max-line-length', dest='max_line_length',
-                        default=80, action='store',
-                        help='Maximum line length')
+                        action='store', help='Maximum line length')
     parser.add_argument('--no-merge-configs', dest='merge_configs',
                         action='store_false',
                         help=('Whether to ignore config files found at a '
