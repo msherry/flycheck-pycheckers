@@ -286,19 +286,29 @@ class LintRunner(object):
                     break
         return config_file
 
-    def user_defined_command_line(self, _filepath):
+    def user_defined_command_line(self, filepath):
         # type: (str) -> Optional[List[str]]
         """Allow users to define their own command-lines for checkers.
 
         E.g. if there is a company-provided script to run mypy, allow users to
         use that instead of the mypy executable directly.
         """
-        # TODO: support parameterization ("%f" placeholder for filenames, etc.)
+        parts = None
         command_line_option_name = '{}_command'.format(self.name)
         if hasattr(self.options, command_line_option_name):
-            # TODO: handle parameterization here
-            return shlex.split(getattr(self.options, command_line_option_name))
-        return None
+            parts = shlex.split(getattr(self.options, command_line_option_name))
+
+        if not parts:
+            return parts
+
+        substitutions = {
+            '%f': filepath,
+        }
+        def map_substitution(part):
+            # type: (str) -> str
+            return substitutions.get(part, part)
+
+        return [map_substitution(part) for part in parts]
 
     def construct_args(self, filepath):
         # type: (str) -> List[str]
