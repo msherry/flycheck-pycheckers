@@ -564,6 +564,9 @@ class Flake8Runner(LintRunner):
         elif 'unable to detect undefined names' in data['description']:
             data['level'] = 'WARNING'
 
+        # Flake8 seems to give the full path in the error output, but we only want the basename
+        data['filename'] = os.path.basename(data['filename'])
+
         return data
 
     def get_run_flags(self, _filepath):
