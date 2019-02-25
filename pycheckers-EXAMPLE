@@ -1,0 +1,28 @@
+[DEFAULT]
+# This is an example of a project-specific .pycheckers file. Uncomment and
+# modify any options that are required, rename to ".pycheckers", and place in
+# the project root directory.
+
+# By default, config files in parent directories are merged in, with lower
+# (more-specific) files taking precedence. This allows you to specify overall
+# options for a project, and a set of override options for a specific directory
+# (e.g. for machine-generated files that should receive less-strict checking).
+
+# Give this option to ignore a certain set of error/warning codes
+# ignore_codes = C0411, C0413, C0103, C0111, W0142, W0201, W0232, W0403, W0511, E1002, E1101, E1103, R0201, R0801, R0903, R0904, R0914
+
+# Specify this option if you have a specific virtualenv location
+# venv_path = /Users/msherry/src/my-project/.venv
+
+# Specify the maximum line length
+# max_line_length = 120
+
+# Custom checkers to run (overrides flycheck-pycheckers-checkers)
+# checkers = pep8,mypy2,bandit,flake8
+
+# Config file locations
+# flake8_config_file = /Users/msherry/src/my-project/conf-files/setup.cfg
+# mypy_config_file = /Users/msherry/src/my-project/conf-files/mypy.ini
+
+# A custom mypy command - use "%f" to splice in the filename to be checked
+# mypy_command = /Users/msherry/src/my-project/tools/my-mypy-script.py %f
