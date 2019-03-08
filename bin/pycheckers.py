@@ -709,8 +709,8 @@ class MyPy2Runner(LintRunner):
 
     output_matcher = re.compile(
         r'(?P<filename>[^:]+):'
-        r'(?P<line_number>[^:]+):'
-        r'((?P<column_number>[^:]+):)?'  # Column number is optional, depending on mypy options
+        r'(?P<line_number>\d+):'
+        r'((?P<column_number>\d+):)?'  # Column number is optional, depending on mypy options
         r' (?P<level>[^:]+):'
         r' (?P<description>.+)$')
 
