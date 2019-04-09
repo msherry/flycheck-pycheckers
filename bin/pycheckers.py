@@ -767,6 +767,9 @@ class MyPy2Runner(LintRunner):
         if config_file:
             flags += ['--config-file', config_file]
 
+        if self.options.mypy_no_implicit_optional:
+            flags += ['--no-implicit-optional']
+
         # Per Guido's suggestion, use the --shadow-file option to work around
         # https://github.com/msherry/flycheck-pycheckers/issues/2, so we can
         # respect per-file mypy.ini config options
@@ -1059,6 +1062,9 @@ def parse_args():
                         action='store',
                         help=("Whether to fake failing checkers's STDERR as a reported "
                               "error for easier display."))
+
+    parser.add_argument('--mypy-no-implicit-optional', type=str2bool, default=False,
+                        action='store')
 
     parser.add_argument('--debug', action='store_true',
                         help=('Enable output to help debug pycheckers itself'))
