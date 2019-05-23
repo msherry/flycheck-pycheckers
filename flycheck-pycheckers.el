@@ -214,7 +214,7 @@ for example.  Can be further customized via the \".pycheckers\"
 config file."
   :type '(repeat :tag "Codes" (string :tag "Error/Warning code")))
 
-(flycheck-def-option-var flycheck-pycheckers-max-line-length 80
+(flycheck-def-option-var flycheck-pycheckers-max-line-length 79
   python-pycheckers
   "The maximum line length allowed by the checkers."
   :type 'integer)

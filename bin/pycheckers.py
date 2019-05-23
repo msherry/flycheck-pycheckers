@@ -1031,7 +1031,7 @@ def parse_args():
                         default='',
                         help="Comma-separated list of error codes to ignore")
     parser.add_argument('--max-line-length', dest='max_line_length',
-                        default=80, action='store',
+                        default=79, action='store',
                         help='Maximum line length')
     parser.add_argument('--no-merge-configs', dest='merge_configs',
                         action='store_false',
