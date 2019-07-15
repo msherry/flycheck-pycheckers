@@ -790,7 +790,7 @@ class MyPy2Runner(LintRunner):
 
         data['level'] = data['level'].upper()
         if data['level'] == 'NOTE':
-            return {}
+            data['level'] = 'INFO'
         return data
 
     def get_filepath(self, filepath):
