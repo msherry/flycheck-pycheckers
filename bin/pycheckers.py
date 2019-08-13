@@ -104,7 +104,7 @@ class LintRunner(object):
 
     command = ''
 
-    single_command_for_project = False
+    runs_from_project_root = False
 
     version_args = ('--version',)
 
@@ -371,8 +371,9 @@ class LintRunner(object):
         out_lines = []
         for stream in streams:
             for line in stream:
-                # If filepaths are project-relative, convert to absolute.
-                if self.single_command_for_project:
+                # If we ran from project root with relative paths, we need
+                # to convert to absolute paths.
+                if self.runs_from_project_root:
                     line = os.path.join(self.find_project_root(filepath), line)
                 match = self.process_output(line)
                 if match:
@@ -429,12 +430,11 @@ class LintRunner(object):
         # TODO: This means we're carrying state around, double-check that we're ok with this.
         self._filepath = filepath
 
-        # If the command doesn't vary per file we run it in the project root.
+        # The command may want to run from the project root instead of wherever we are now.
         old_cwd = None  # type: Optional[str]
-        if self.single_command_for_project:
+        if self.runs_from_project_root:
             old_cwd = os.getcwd()
             os.chdir(self.find_project_root(filepath))
-
 
         args = self.construct_args(filepath)
         try:
@@ -732,9 +732,9 @@ class MyPy2Runner(LintRunner):
         return 'mypy'
 
     @property
-    def single_command_for_project(self):
-        # In daemon mode we always run the same command
-        # (to check everything).
+    def runs_from_project_root(self):
+        # In daemon mode we run a single command at project
+        # root that checks everything.
         return self.options.mypy_use_daemon
 
 
