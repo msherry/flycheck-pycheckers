@@ -104,6 +104,8 @@ class LintRunner(object):
 
     command = ''
 
+    single_command_for_project = False
+
     version_args = ('--version',)
 
     version_matcher = re.compile(r'')
@@ -216,8 +218,10 @@ class LintRunner(object):
         return {}
 
     def get_filepath(self, filepath):
-        # type: (str) -> str
-        """Called to manipulate the path to the file being checked, for checkers that need it."""
+        # type: (str) -> Optional[str]
+        """Called to manipulate the path to the file being checked, for checkers that need it.
+
+        The checker can return None if the file should not be included in the check command."""
         return filepath
 
     def find_project_root(self, filepath):
@@ -323,7 +327,9 @@ class LintRunner(object):
         # Get checker arguments
         args.extend(self.get_run_flags(filepath))
         # Get a checker-specific filename, if necessary
-        args.append(self.get_filepath(filepath))
+        checker_filepath = self.get_filepath(filepath)
+        if checker_filepath is not None:
+            args.append(checker_filepath)
         return args
 
     def construct_version_args(self):
@@ -365,6 +371,9 @@ class LintRunner(object):
         out_lines = []
         for stream in streams:
             for line in stream:
+                # If filepaths are project-relative, convert to absolute.
+                if self.single_command_for_project:
+                    line = os.path.join(self.find_project_root(filepath), line)
                 match = self.process_output(line)
                 if match:
                     tokens = dict(self.output_template)
@@ -420,8 +429,14 @@ class LintRunner(object):
         # TODO: This means we're carrying state around, double-check that we're ok with this.
         self._filepath = filepath
 
-        args = self.construct_args(filepath)
+        # If the command doesn't vary per file we run it in the project root.
+        old_cwd = None  # type: Optional[str]
+        if self.single_command_for_project:
+            old_cwd = os.getcwd()
+            os.chdir(self.find_project_root(filepath))
 
+
+        args = self.construct_args(filepath)
         try:
             process = Popen(
                 args, stdout=PIPE, stderr=PIPE, universal_newlines=True,
@@ -429,6 +444,9 @@ class LintRunner(object):
         except Exception as e:                   # pylint: disable=broad-except
             print(e, args)
             return 1, [str(e)]
+
+        if old_cwd is not None:
+            os.chdir(old_cwd)
 
         out, err = process.communicate()
         process.wait()
@@ -705,7 +723,20 @@ class PylintRunner(LintRunner):
 
 class MyPy2Runner(LintRunner):
 
-    command = 'mypy'
+    # A few of our properties vary if we're in daemon mode:
+
+    @property
+    def command(self):
+        if self.options.mypy_use_daemon:
+            return 'dmypy'
+        return 'mypy'
+
+    @property
+    def single_command_for_project(self):
+        # In daemon mode we always run the same command
+        # (to check everything).
+        return self.options.mypy_use_daemon
+
 
     output_matcher = re.compile(
         r'(?P<filename>[^:]+):'
@@ -746,10 +777,16 @@ class MyPy2Runner(LintRunner):
         # type: (str) -> Iterable[str]
         """Determine which mypy (2 or 3) to run, find the cache dir and config file"""
 
+        daemon_mode = self.options.mypy_use_daemon
         flags = self._base_flags
-        if self.version < LooseVersion('0.660'):
-            # --quick-and-dirty is still available
-            flags += ['--quick-and-dirty']
+
+        if daemon_mode:
+            flags = [f for f in flags if f != '--incremental']
+            flags = ['run', '--timeout', '600', '--', '--follow-imports=error'] + flags
+        else:
+            if self.version < LooseVersion('0.660'):
+                # --quick-and-dirty is still available
+                flags += ['--quick-and-dirty']
 
         # TODO: this is a hack, we should clean this up in case the file
         # legitimately contains this string
@@ -774,7 +811,21 @@ class MyPy2Runner(LintRunner):
         # https://github.com/msherry/flycheck-pycheckers/issues/2, so we can
         # respect per-file mypy.ini config options
         # TODO: only do this when being run by flycheck?
-        flags += ['--shadow-file', filepath, original_filepath]
+        if not daemon_mode:
+            flags += ['--shadow-file', filepath, original_filepath]
+        else:
+            # For daemon mode we have to pass all python files we want it
+            # to consider explicitly (it can't do its normal follow imports
+            # thing).
+
+            # TODO: currently using space delimiting when constructing this
+            # file list. It may be nice to add a zero-delimiting option or
+            # something to properly handle filenames with spaces and whatnot.
+            from subprocess import check_output
+            flags += check_output(self.options.mypy_daemon_files_command,
+                                  shell=True).strip().split(' ')
+
+
         return flags
 
     def fixup_data(self, _line, data, filepath):
@@ -794,10 +845,14 @@ class MyPy2Runner(LintRunner):
         return data
 
     def get_filepath(self, filepath):
-        # type: (str) -> str
+        # type: (str) -> Optional[str]
         """Mypy's weird shadow option means we have to pass the original filepath, not
-        the flycheck-munged one
+        the flycheck-munged one.
+        Also, in daemon mode we don't pass a path at all (the daemon command includes
+        all project files)
         """
+        if self.options.mypy_use_daemon:
+            return None
         return filepath.replace('flycheck_', '')
 
 
@@ -1055,6 +1110,22 @@ def parse_args():
     parser.add_argument('--mypy-config-file', default=None,
                         dest='mypy_config_file',
                         help='Location of a config file for mypy')
+    parser.add_argument('--mypy-use-daemon', type=str2bool, default=False,
+                        action='store',
+                        help='Whether to run mypy in daemon mode. Defaults to'
+                        ' false. This can greatly increase performance but '
+                        ' comes with a few drawbacks: First, it only sees'
+                        ' files as they exist on disk, so unsaved changes'
+                        ' will not be reflected. Second, it requires providing'
+                        ' a static set of python files/dirs to be operated on'
+                        ' (see --mypy-daemon-files-command).')
+    parser.add_argument('--mypy-daemon-files-command',
+                        default='echo .', action='store',
+                        help='A shell command to run to generate the list of'
+                        ' python files/dirs for the mypy daemon.'
+                        ' Mypy in daemon mode will only process files included'
+                        ' here. This command gets run from project root.'
+                        ' It defaults to "echo ."')
     parser.add_argument('--flake8-config-file', default=None,
                         dest='flake8_config_file',
                         help='Location of a config file for flake8')
