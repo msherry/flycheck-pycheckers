@@ -818,12 +818,18 @@ class MyPy2Runner(LintRunner):
             # to consider explicitly (it can't do its normal follow imports
             # thing).
 
-            # TODO: currently using space delimiting when constructing this
-            # file list. It may be nice to add a zero-delimiting option or
-            # something to properly handle filenames with spaces and whatnot.
-            from subprocess import check_output
-            flags += check_output(self.options.mypy_daemon_files_command,
-                                  shell=True).strip().split(' ')
+            # Currently expecting this command to spit out one file per
+            # line; this way we work well with the find command and support
+            # spaces in filenames.
+            from subprocess import check_output, CalledProcessError
+            try:
+                flags += check_output(self.options.mypy_daemon_files_command,
+                                      shell=True).strip().split('\n')
+            except CalledProcessError as exc:
+                # Intercept problems here to avoid gumming up the rest of the
+                # checks. Is there a better way we should get this error
+                # message to the user?
+                print('Error running mypy-daemon-files-command:', exc)
 
 
         return flags
@@ -1120,12 +1126,15 @@ def parse_args():
                         ' a static set of python files/dirs to be operated on'
                         ' (see --mypy-daemon-files-command).')
     parser.add_argument('--mypy-daemon-files-command',
-                        default='echo .', action='store',
+                        default='find tools -name "*.py"', action='store',
                         help='A shell command to run to generate the list of'
                         ' python files/dirs for the mypy daemon.'
                         ' Mypy in daemon mode will only process files included'
-                        ' here. This command gets run from project root.'
-                        ' It defaults to "echo ."')
+                        ' here. This command gets run from project root and'
+                        ' should return one filename per line.'
+                        ' It defaults to \'find . -name "*.py"\'. To debug'
+                        ' this, look for a running dmypy process and see which'
+                        ' args have been passed to it.')
     parser.add_argument('--flake8-config-file', default=None,
                         dest='flake8_config_file',
                         help='Location of a config file for flake8')
