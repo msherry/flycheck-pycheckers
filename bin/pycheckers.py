@@ -1126,7 +1126,7 @@ def parse_args():
                         ' a static set of python files/dirs to be operated on'
                         ' (see --mypy-daemon-files-command).')
     parser.add_argument('--mypy-daemon-files-command',
-                        default='find tools -name "*.py"', action='store',
+                        default='find . -name "*.py"', action='store',
                         help='A shell command to run to generate the list of'
                         ' python files/dirs for the mypy daemon.'
                         ' Mypy in daemon mode will only process files included'
