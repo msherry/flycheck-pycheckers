@@ -371,10 +371,6 @@ class LintRunner(object):
         out_lines = []
         for stream in streams:
             for line in stream:
-                # If we ran from project root with relative paths, we need
-                # to convert to absolute paths.
-                if self.runs_from_project_root:
-                    line = os.path.join(self.find_project_root(filepath), line)
                 match = self.process_output(line)
                 if match:
                     tokens = dict(self.output_template)
@@ -436,7 +432,11 @@ class LintRunner(object):
             old_cwd = os.getcwd()
             os.chdir(self.find_project_root(filepath))
 
-        args = self.construct_args(filepath)
+        try:
+            args = self.construct_args(filepath)
+        except Exception as e:
+            print(e)
+            return 1, [str(e)]
         try:
             process = Popen(
                 args, stdout=PIPE, stderr=PIPE, universal_newlines=True,
@@ -727,12 +727,14 @@ class MyPy2Runner(LintRunner):
 
     @property
     def command(self):
+        # type: () -> str
         if self.options.mypy_use_daemon:
             return 'dmypy'
         return 'mypy'
 
     @property
     def runs_from_project_root(self):
+        # type: () -> bool
         # In daemon mode we run a single command at project
         # root that checks everything.
         return self.options.mypy_use_daemon
@@ -826,10 +828,10 @@ class MyPy2Runner(LintRunner):
                 flags += check_output(self.options.mypy_daemon_files_command,
                                       shell=True).strip().split('\n')
             except CalledProcessError as exc:
-                # Intercept problems here to avoid gumming up the rest of the
-                # checks. Is there a better way we should get this error
-                # message to the user?
-                print('Error running mypy-daemon-files-command:', exc)
+                # Convert this to a FatalException to get it to show up in the
+                # current file buffer.
+                raise FatalException('Mypy daemon files command failed: ' + str(exc),
+                                     filepath)
 
 
         return flags
