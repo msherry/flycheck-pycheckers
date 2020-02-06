@@ -966,7 +966,7 @@ def update_options_locally(options):
                 # Special case config files to contain the full path - assume
                 # the specified path is absolute, or relative to the current
                 # .pycheckers file
-                if 'config_file' in key:
+                if 'config_file' in key or 'rcfile' in key:
                     if not os.path.isabs(value):
                         value = os.path.join(os.path.dirname(config_file_path), value)
                 # Allow for extending, rather than replacing, ignore codes
