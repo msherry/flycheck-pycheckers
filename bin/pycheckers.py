@@ -766,6 +766,15 @@ class MyPy2Runner(LintRunner):
         config_file = self.find_config_file('mypy_config_file', ['mypy.ini'])
         if config_file:
             flags += ['--config-file', config_file]
+            mypy_config = ConfigParser()
+            mypy_config.read(config_file)
+            if mypy_config.has_option('mypy', 'mypy_path'):
+                # contextual source for mypy, useful when tests are outside module definition
+                for mypy_path in mypy_config.get('mypy', 'mypy_path').replace(':', ',').split(','):
+                    try:
+                        os.path.dirname(original_filepath).index(os.path.join(os.path.dirname(config_file), mypy_path))
+                    except ValueError:
+                        flags.append(mypy_path)
 
         if self.options.mypy_no_implicit_optional:
             flags += ['--no-implicit-optional']
