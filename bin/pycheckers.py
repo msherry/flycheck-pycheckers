@@ -766,15 +766,12 @@ class MyPy2Runner(LintRunner):
         config_file = self.find_config_file('mypy_config_file', ['mypy.ini'])
         if config_file:
             flags += ['--config-file', config_file]
-            mypy_config = ConfigParser()
-            mypy_config.read(config_file)
-            if mypy_config.has_option('mypy', 'mypy_path'):
-                # contextual source for mypy, useful when tests are outside module definition
-                for mypy_path in mypy_config.get('mypy', 'mypy_path').replace(':', ',').split(','):
-                    try:
-                        os.path.dirname(original_filepath).index(os.path.join(os.path.dirname(config_file), mypy_path))
-                    except ValueError:
-                        flags.append(mypy_path)
+            original_filedir = os.path.dirname(original_filepath)
+            for mypy_path in self.get_mypy_paths(config_file):
+                if self.is_directory_outside_mypy_path(original_filedir, mypy_path):
+                    # contextual source for a mypy module
+                    # i.e., when a module's tests are outside the module's definitions
+                    flags.append(mypy_path)
 
         if self.options.mypy_no_implicit_optional:
             flags += ['--no-implicit-optional']
@@ -809,6 +806,29 @@ class MyPy2Runner(LintRunner):
         """
         return filepath.replace('flycheck_', '')
 
+    def get_mypy_paths(self, config_file):
+        # type: (str) -> List[str]
+        """Mypy allows for both comma-delimited, as well as colon-delimited lists of paths
+        when setting mypy_path: https://mypy.readthedocs.io/en/stable/config_file.html#import-discovery
+        """
+        mypy_paths = []
+        mypy_config = ConfigParser()
+        mypy_config.read(config_file)
+        if mypy_config.has_option('mypy', 'mypy_path'):
+            config_dir = os.path.dirname(config_file)
+            for mypy_path in mypy_config.get('mypy', 'mypy_path').replace(':', ',').split(','):
+                mypy_paths.append(os.path.join(config_dir, mypy_path))
+        return mypy_paths
+
+    def is_directory_outside_mypy_path(self, original_filedir, mypy_path):
+        # type: (str, str) -> bool
+        """Determine if `original_filedir` exists outside of `mypy_path`'s directory.
+        """
+        try:
+            original_filedir.index(mypy_path)
+        except ValueError:
+            return True
+        return False
 
 class MyPy3Runner(MyPy2Runner):
 
