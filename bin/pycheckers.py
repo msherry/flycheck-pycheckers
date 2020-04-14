@@ -237,20 +237,19 @@ class LintRunner(object):
         # type: (str, str) -> str
         """Find the root directory of the current project.
 
-        1. Walk up the directory tree looking for a VCS directory.
-        2. Failing that, find a virtualenv that matches a part of the
-               directory, and choose that as the root.
+        1. Find a virtualenv that matches a part of the directory, and choose that.
+        2. Failing that, walk up the directory tree looking for a VCS directory.
         3. Otherwise, just use the local directory.
         """
         # Case 1
-        vcs_root, _vcs_name = find_vcs_root(source_file)
-        if vcs_root:
-            return vcs_root
-
-        # Case 2
         project_dir, _venv_path = guess_virtualenv(source_file, venv_root)
         if project_dir:
             return project_dir
+
+        # Case 2
+        vcs_root, _vcs_name = find_vcs_root(source_file)
+        if vcs_root:
+            return vcs_root
 
         # Case 3
         return os.path.dirname(source_file)
