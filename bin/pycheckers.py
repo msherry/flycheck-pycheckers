@@ -60,6 +60,30 @@ class FatalException(Exception):
             msg=self.msg, filename=self.filename)
 
 
+class _Path(object):
+    """Base class for various types of paths (root-relative, absolute, filename-only, etc.)"""
+
+    def __init__(self, p):
+        # type: (str) -> None
+        self.path = p
+
+    def __str__(self):
+        # type: () -> str
+        return self.path
+
+    def __repr__(self):
+        # type: () -> str
+        return '{}("{}")'.format(self.__class__.__name__, self.path)
+
+
+class RootRelativePath(_Path):
+    pass
+
+
+class AbsPath(_Path):
+    pass
+
+
 def is_true(v):
     # type: (str) -> bool
     return v.lower() in {'yes', 'true', 't', 'y', 'on', '1'}
@@ -255,7 +279,7 @@ class LintRunner(object):
         return os.path.dirname(source_file)
 
     def find_file_in_project_root(self, filename):
-        # type: (str) -> Optional[str]
+        # type: (str) -> Optional[AbsPath]
         """Check if `filename` (generally a config file) exists in project
         root, and return the full path if so. Otherwise, return None.
         """
@@ -437,6 +461,7 @@ class LintRunner(object):
             print(e)
             return 1, [str(e)]
         try:
+            self.debug('{} command: {}'.format(self.name, ' '.join(args)))
             process = Popen(
                 args, stdout=PIPE, stderr=PIPE, universal_newlines=True,
                 env=dict(os.environ, **self.get_env_vars()))
@@ -725,14 +750,14 @@ class MyPy2Runner(LintRunner):
     # A few of our properties vary if we're in daemon mode:
 
     @property
-    def command(self):
+    def command(self):          # type: ignore
         # type: () -> str
         if self.options.mypy_use_daemon:
             return 'dmypy'
         return 'mypy'
 
     @property
-    def runs_from_project_root(self):
+    def runs_from_project_root(self):  # type: ignore
         # type: () -> bool
         # In daemon mode we run a single command at project
         # root that checks everything.
@@ -841,8 +866,23 @@ class MyPy2Runner(LintRunner):
         # those out. Since we may be using the --shadow-file option, check for
         # the original filename, not the flycheck-munged one
         original_filename = os.path.basename(filepath).replace('flycheck_', '')
-        if original_filename not in data['filename']:
+        original_filepath = RootRelativePath(os.path.join(os.path.dirname(filepath), original_filename))
+        if str(original_filename) not in data['filename']:
             return {}
+
+        # That wasn't enough, though -- we've just filtered by the basename, so even if
+        # we're trying to check affirm-users/affirm/users/controllers/user.py, we'll get
+        # errors for affirm-users/affirm/users/models/user.py.
+
+        # We may have a partial (root-relative) path in `data`, and potentially an
+        # absolute path in `filepath`. Or some other mixture. Longer-term, we need to have
+        # better typing around all these paths so we know what we're dealing with. For
+        # now, we can ensure that data['filename'] is a substring of filepath (or
+        # vice-versa, just in case?)
+
+        if str(original_filepath) not in data['filename'] and data['filename'] not in str(original_filepath):
+            return {}
+
         data['filename'] = os.path.basename(original_filename)
 
         data['level'] = data['level'].upper()
