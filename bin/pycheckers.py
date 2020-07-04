@@ -1217,8 +1217,8 @@ def main():
     checker_names = [checker.strip() for checker in checkers.split(',')]
     try:
         [RUNNERS[checker_name] for checker_name in checker_names]
-    except KeyError:
-        croak(("Unknown checker {}".format(checker_name),  # pylint: disable=used-before-assignment
+    except KeyError as e:
+        croak(("Unknown checker: {}".format(e),  # pylint: disable=used-before-assignment
                "Expected one of %s" % ', '.join(RUNNERS.keys())),
               filename=options.file)
 
