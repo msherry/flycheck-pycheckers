@@ -22,7 +22,7 @@ from csv import DictReader
 from distutils.version import LooseVersion
 from functools import partial
 import shlex
-from subprocess import PIPE, Popen, call
+from subprocess import PIPE, Popen
 
 # TODO: Ignore the type of conditional imports until
 # https://github.com/python/mypy/issues/1107 is fixed
@@ -39,7 +39,7 @@ try:
     # pylint: disable=unused-import, ungrouped-imports
     from argparse import Namespace
     from typing import (
-        Any, Dict, List, IO, Iterable, Optional, Set, Tuple, Union)
+        Any, Dict, List, Iterable, Optional, Set, Tuple, Union)
 except ImportError:
     pass
 
@@ -320,10 +320,11 @@ class LintRunner(object):
         E.g. if there is a company-provided script to run mypy, allow users to
         use that instead of the mypy executable directly.
         """
-        parts = None
-        command_line_option_name = '{}_command'.format(self.name)
-        if hasattr(self.options, command_line_option_name):
-            parts = shlex.split(getattr(self.options, command_line_option_name))
+        user_command_line_option = self._user_command_line_option()
+        if user_command_line_option:
+            parts = shlex.split(user_command_line_option)  # type: Optional[List[str]]
+        else:
+            parts = None
 
         if not parts:
             return parts
@@ -413,10 +414,22 @@ class LintRunner(object):
                         errors_or_warnings += 1
         return errors_or_warnings, out_lines
 
+    def _user_command_line_option(self):
+        # type: () -> str
+        command_line_option_name = '{}_command'.format(self.name)
+        command_line_option = getattr(self.options, command_line_option_name, "")
+
+        return command_line_option
+
     def _executable_exists(self):
         # type: () -> bool
+        user_cmd_line = self._user_command_line_option()
+        if user_cmd_line:
+            return True
+
         # https://stackoverflow.com/a/6569511/52550
         args = ['/usr/bin/env', 'which', self.command]
+
         try:
             process = Popen(args, stdout=PIPE, stderr=PIPE)
         except Exception as e:                   # pylint: disable=broad-except
@@ -424,9 +437,7 @@ class LintRunner(object):
             return False
         exec_path, _err = process.communicate()
 
-        args = ['[', '-x', exec_path.strip(), ']']
-        retcode = call(args)
-        return retcode == 0
+        return bool(exec_path) and process.returncode == 0
 
     def run(self, filepath):
         # type: (str) -> Tuple[int, List[str]]
