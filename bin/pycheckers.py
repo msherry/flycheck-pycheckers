@@ -331,10 +331,14 @@ class LintRunner(object):
 
         substitutions = {
             '%f': filepath,
+            '%r': self.find_project_root(filepath),
         }
         def map_substitution(part):
             # type: (str) -> str
-            return substitutions.get(part, part)
+            for sub, replacement in substitutions.items():
+                if sub in part:
+                    part = part.replace(sub, replacement)
+            return part
 
         return [map_substitution(part) for part in parts]
 
