@@ -822,7 +822,7 @@ class MyPy2Runner(LintRunner):
 
         if daemon_mode:
             flags = [f for f in flags if f != '--incremental']
-            flags = ['run', '--timeout', '600', '--', '--follow-imports=error'] + flags
+            flags = ['run', '--timeout', '600', '--'] + flags
         else:
             if self.version < LooseVersion('0.660'):
                 # --quick-and-dirty is still available
