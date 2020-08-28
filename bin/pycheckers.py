@@ -786,8 +786,9 @@ class MyPy2Runner(LintRunner):
         r' (?P<level>[^:]+):'
         r' (?P<description>.+)$')
 
+    # Note: this needs to match both mypy and dmypy
     version_matcher = re.compile(
-        r'mypy (?P<version>[0-9.]+)'
+        r'd?mypy (?P<version>[0-9.]+)'
     )
 
     _base_flags = [
@@ -822,7 +823,11 @@ class MyPy2Runner(LintRunner):
 
         if daemon_mode:
             flags = [f for f in flags if f != '--incremental']
-            flags = ['run', '--timeout', '600', '--', '--follow-imports=error'] + flags
+            # Older daemon versions didn't support following imports
+            if self.version < LooseVersion('0.780'):
+                flags = ['run', '--timeout', '600', '--', '--follow-imports=error'] + flags
+            else:
+                flags = ['run', '--timeout', '600', '--'] + flags
         else:
             if self.version < LooseVersion('0.660'):
                 # --quick-and-dirty is still available
