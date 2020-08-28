@@ -786,8 +786,9 @@ class MyPy2Runner(LintRunner):
         r' (?P<level>[^:]+):'
         r' (?P<description>.+)$')
 
+    # Note: this needs to match both mypy and dmypy
     version_matcher = re.compile(
-        r'mypy (?P<version>[0-9.]+)'
+        r'.*mypy (?P<version>[0-9.]+)'
     )
 
     _base_flags = [
