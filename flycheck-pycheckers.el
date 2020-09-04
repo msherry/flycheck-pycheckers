@@ -28,6 +28,8 @@
 ;; in parallel.  The list of supported checkers includes:
 ;;
 ;; - pylint
+;; - pylint-py3k (Command: pylint --py3k)
+;; - pylint3
 ;; - flake8
 ;; - pep8
 ;; - pyflakes
@@ -151,7 +153,7 @@
 ;;   warnings about indentation or code style.
 ;;
 ;; * `pylint_rcfile' - the location of a project-specific configuration file
-;;   for pylint
+;;   for pylint, pylint-py3k, pylint3
 ;;
 ;; * `mypy_config_file' - the location of a project-specific configuration file
 ;;   for mypy
@@ -179,6 +181,8 @@
   "The set of enabled checkers to run."
   :type '(set
           (const :tag "pylint" pylint)
+          (const :tag "pylint-py3k" pylint-py3k)
+          (const :tag "pylint3" pylint3)
           (const :tag "PEP8" pep8)
           (const :tag "flake8" flake8)
           (const :tag "pyflakes" pyflakes)
