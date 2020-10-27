@@ -11,6 +11,8 @@ This package provides a way to run multiple syntax checkers on Python code,
 in parallel.  The list of supported checkers includes:
 
 - [pylint](https://www.pylint.org/)
+- [pylint-py3k](https://www.pylint.org/) (Command: pylint --py3k)
+- [pylint3](https://www.pylint.org/)
 - [flake8](http://flake8.pycqa.org/)
 - [pep8](https://www.python.org/dev/peps/pep-0008/)
 - [pyflakes](https://github.com/PyCQA/pyflakes)
@@ -135,7 +137,7 @@ Note that these are implemented as modifying the values received by
   For example, a directory containing auto-generated code may omit various
   warnings about indentation or code style.
 * `pylint_rcfile` - the location of a project-specific configuration file
-  for pylint
+  for pylint, pylint-py3k, pylint3
 * `mypy_config_file` - the location of a project-specific configuration file
   for mypy
 * `flake8_config_file` - the location of a project-specific configuration file
