@@ -203,7 +203,8 @@ Can be further customized via the \".pycheckers\" config file."
           (repeat :tag "Codes (overrides config files)" (string :tag "Error/Warning code"))
           (const :tag "Don't ignore any errors (report everything). Overrides config files." none)))
 
-(define-obsolete-variable-alias 'flycheck-pycheckers-enabled-codes 'flycheck-pycheckers-enable-codes)
+(define-obsolete-variable-alias 'flycheck-pycheckers-enabled-codes 'flycheck-pycheckers-enable-codes "2017-12-08"
+  "Consistently use 'ignore' and 'enable'")
 (flycheck-def-option-var flycheck-pycheckers-enable-codes
     '("W0613")
   python-pycheckers
