@@ -732,6 +732,8 @@ class PylintRunner(LintRunner):
     def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
         args = []
+        if self.name == 'pylint-py3k':
+            args.append('--py3k')
         if self.ignore_codes is not None:
             args.append('--disable=' + ','.join(self.ignore_codes))
         args += [
@@ -758,6 +760,30 @@ class PylintRunner(LintRunner):
         # type: (int) -> bool
         # https://docs.pylint.org/en/1.6.0/run.html, pylint returns a bit-encoded exit code.
         return not (returncode & 1 or returncode & 32)
+
+
+class PylintPy3kRunner(PylintRunner):
+    """Run pylint --py3k, producing flymake readable output.
+
+    Run pylint in Python 3 porting mode, all checkers will be disabled
+    and only messages emitted by the porting checker will be displayed
+
+    See: PylintRunner
+    """
+
+    @property
+    def name(self):
+        # type: () -> str
+        return 'pylint-py3k'
+
+
+class Pylint3Runner(PylintRunner):
+    """Run pylint3, producing flymake readable output.
+
+    See: PylintRunner
+    """
+
+    command = 'pylint3'
 
 
 class MyPy2Runner(LintRunner):
@@ -971,6 +997,8 @@ RUNNERS = {
     'flake8': Flake8Runner,
     'pep8': Pep8Runner,
     'pylint': PylintRunner,
+    'pylint-py3k': PylintPy3kRunner,
+    'pylint3': Pylint3Runner,
     'mypy2': MyPy2Runner,
     'mypy3': MyPy3Runner,
     'bandit': BanditRunner,
@@ -1172,7 +1200,7 @@ def parse_args():
                               '(not using virtualenvwrapper) virtualenv.'))
     parser.add_argument('--pylint-rcfile', default=None,
                         dest='pylint_rcfile',
-                        help='Location of a config file for pylint')
+                        help='Location of a config file for pylint, pylint-py3k, pylint3')
     parser.add_argument('--mypy-config-file', default=None,
                         dest='mypy_config_file',
                         help='Location of a config file for mypy')
