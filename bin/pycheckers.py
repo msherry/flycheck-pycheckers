@@ -845,7 +845,9 @@ class MyPy2Runner(LintRunner):
             # mypy2 mode
             flags += ['--py2']
 
-        config_file = self.find_config_file('mypy_config_file', ['mypy.ini'])
+        config_file = self.find_config_file(
+            'mypy_config_file',
+            ['mypy.ini', '.mypy.ini', 'pyproject.toml', 'setup.cfg'])
         if config_file:
             flags += ['--config-file', config_file]
 
