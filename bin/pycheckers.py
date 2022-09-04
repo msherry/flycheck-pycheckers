@@ -385,10 +385,10 @@ class LintRunner(object):
         """Called to perform any optional cleanups of the parsed data."""
         return data
 
-    def process_returncode(self, _returncode):
+    def process_returncode(self, returncode):
         # type: (int) -> bool
         """Return True if the checker's returncode indicates successful check, False otherwise"""
-        return True
+        return returncode == 0
 
     def _process_streams(self, filepath, *streams):
         # type: (str, *List[str]) -> Tuple[int, List[str]]
