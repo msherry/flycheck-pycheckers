@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """A hacked up version of the multiple-Python checkers script from EmacsWiki.
 
-Original work taken from http://www.emacswiki.org/emacs/PythonMode, author
-unknown.
+Original work taken from http://www.emacswiki.org/emacs/PythonMode, 
+  by Justin Van Winkle.
 
 Further extended by Jason Kirtland <jek@discorporate.us> under the Creative
 Commons Share Alike 1.0 license:
