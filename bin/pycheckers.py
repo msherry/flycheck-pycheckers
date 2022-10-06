@@ -961,6 +961,10 @@ class BanditRunner(LintRunner):
     def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
         flags = ['-f', 'csv']
+        config_file = self.find_config_file('bandit_config_file', ['.bandit'])
+        if config_file:
+            flags += ['--ini', config_file]
+
         if self.ignore_codes is not None:
             # NOTE: this doesn't work if the code isn't recognized as a bandit
             # code (e.g. pylint errors)
