@@ -19,7 +19,7 @@ import sys
 import time
 from argparse import ArgumentParser, ArgumentTypeError
 from csv import DictReader
-from distutils.version import LooseVersion
+from packaging.version import Version
 from functools import partial
 import shlex
 from subprocess import PIPE, Popen
@@ -145,7 +145,7 @@ class LintRunner(object):
         # The root directory of the current project
         self._project_root = None         # type: Optional[str]
         # The version of the checker, if available
-        self._version = None              # type: Optional[LooseVersion]
+        self._version = None              # type: Optional[Version]
         # Any debugging output
         self._debug_lines = []            # type: List[str]
 
@@ -224,10 +224,10 @@ class LintRunner(object):
 
     @property
     def version(self):
-        # type: () -> LooseVersion
+        # type: () -> Version
         """The version of the current checker."""
         if not self._version:
-            self._version = LooseVersion(self._get_version() or '0')
+            self._version = Version(self._get_version() or '0')
             assert self._version  # make mypy happy
         return self._version
 
@@ -630,7 +630,7 @@ class Flake8Runner(LintRunner):
         # type: (str) -> Iterable[str]
         args = []
         if self.ignore_codes is not None:
-            if self.version >= LooseVersion('3.6.0'):
+            if self.version >= Version('3.6.0'):
                 # This only works with flake8 3.6.0+, and *extends*
                 # the values given by a config file.
                 args.append('--extend-ignore=' + ','.join(self.ignore_codes))
@@ -824,12 +824,12 @@ class MyPy2Runner(LintRunner):
         if daemon_mode:
             flags = [f for f in flags if f != '--incremental']
             # Older daemon versions didn't support following imports
-            if self.version < LooseVersion('0.780'):
+            if self.version < Version('0.780'):
                 flags = ['run', '--timeout', '600', '--', '--follow-imports=error'] + flags
             else:
                 flags = ['run', '--timeout', '600', '--'] + flags
         else:
-            if self.version < LooseVersion('0.660'):
+            if self.version < Version('0.660'):
                 # --quick-and-dirty is still available
                 flags += ['--quick-and-dirty']
 
