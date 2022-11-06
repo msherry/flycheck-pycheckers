@@ -732,6 +732,8 @@ class PylintRunner(LintRunner):
     def get_run_flags(self, _filepath):
         # type: (str) -> Iterable[str]
         args = []
+        if self.name == 'pylint-py3k':
+            args.append('--py3k')
         if self.ignore_codes is not None:
             args.append('--disable=' + ','.join(self.ignore_codes))
         args += [
@@ -758,6 +760,30 @@ class PylintRunner(LintRunner):
         # type: (int) -> bool
         # https://docs.pylint.org/en/1.6.0/run.html, pylint returns a bit-encoded exit code.
         return not (returncode & 1 or returncode & 32)
+
+
+class PylintPy3kRunner(PylintRunner):
+    """Run pylint --py3k, producing flymake readable output.
+
+    Run pylint in Python 3 porting mode, all checkers will be disabled
+    and only messages emitted by the porting checker will be displayed
+
+    See: PylintRunner
+    """
+
+    @property
+    def name(self):
+        # type: () -> str
+        return 'pylint-py3k'
+
+
+class Pylint3Runner(PylintRunner):
+    """Run pylint3, producing flymake readable output.
+
+    See: PylintRunner
+    """
+
+    command = 'pylint3'
 
 
 class MyPy2Runner(LintRunner):
@@ -967,15 +993,23 @@ class BanditRunner(LintRunner):
             flags += ['--skip', ','.join(self.ignore_codes)]
         return flags
 
+class RunnerT():
+
+    def __init__(self, checker_class, py2, py3):
+        self.checker_class = checker_class
+        self.py2 = py2
+        self.py3 = py3
 
 RUNNERS = {
-    'pyflakes': PyflakesRunner,
-    'flake8': Flake8Runner,
-    'pep8': Pep8Runner,
-    'pylint': PylintRunner,
-    'mypy2': MyPy2Runner,
-    'mypy3': MyPy3Runner,
-    'bandit': BanditRunner,
+    'pyflakes'   : RunnerT(PyflakesRunner,   True, False),
+    'flake8'     : RunnerT(Flake8Runner,     True, False),
+    'pep8'       : RunnerT(Pep8Runner,       True, True),
+    'pylint'     : RunnerT(PylintRunner,     True, False),
+    'pylint-py3k': RunnerT(PylintPy3kRunner, True, False),
+    'pylint3'    : RunnerT(Pylint3Runner,    False, True),
+    'mypy2'      : RunnerT(MyPy2Runner,      True, False),
+    'mypy3'      : RunnerT(MyPy3Runner,      False, True),
+    'bandit'     : RunnerT(BanditRunner,     True, True),
 }
 
 
@@ -1049,11 +1083,63 @@ def update_options_locally(options):
     return options
 
 
+def py2_py3_enable(py23_autodetect, source_file_path):
+    # type: (str) -> bool, bool
+    '''
+    Check if first line says python/python2/python3 => Activate py2/3 checkers
+
+    Can be overruled via a line: # py:<version>
+    If <version> contains 2 -> then set py2 (1th return value)
+    If <version> contains 3 -> then set py3 (2nd return value)
+    '''
+
+    if not py23_autodetect:
+        return True, True
+
+    with open(source_file_path) as f:
+        line = f.readline()
+        py2 = True
+        py3 = True
+        if 'python3' in line:
+            py2 = False
+            py3 = True
+        elif 'python2' in line or 'python' in line:
+            py2 = True
+            py3 = False
+
+        # Overrule checkers via # py:23 anywhere in the file
+        # Check if a r'^# py:<version>$', where <version> is one of '2', '23', '2|3', '3'
+        lines = f.read().split('\n')
+        preg = re.compile(r'^# py:(?P<version>.*)$')
+        for l in lines:
+            m = preg.match(l)
+            if m:
+                if '2' in m.group('version'):
+                    py2 = True
+                else:
+                    py2 = False
+                if '3' in m.group('version'):
+                    py3 = True
+                else:
+                    py3 = False
+        return py2, py3
+
+
 def run_one_checker(ignore_codes, enable_codes, options, source_file_path, checker_name):
     # type: (Tuple[str], Tuple[str], Namespace, str, str) -> Tuple[int, List[str]]
-    checker_class = RUNNERS[checker_name]
-    runner = checker_class(ignore_codes, enable_codes, options)
-    errors_or_warnings, out_lines = runner.run(source_file_path)
+
+    # Py2 and/or py3?
+    py2, py3 = py2_py3_enable(options.py23_autodetect, source_file_path)
+
+    checker_class = RUNNERS[checker_name].checker_class
+    if ((py2 and RUNNERS[checker_name].py2)
+        or
+        (py3 and RUNNERS[checker_name].py3)
+        ):
+        runner = checker_class(ignore_codes, enable_codes, options)
+        errors_or_warnings, out_lines = runner.run(source_file_path)
+    else:
+        errors_or_warnings, out_lines = 0, []
     return (errors_or_warnings, out_lines)
 
 
@@ -1174,7 +1260,7 @@ def parse_args():
                               '(not using virtualenvwrapper) virtualenv.'))
     parser.add_argument('--pylint-rcfile', default=None,
                         dest='pylint_rcfile',
-                        help='Location of a config file for pylint')
+                        help='Location of a config file for pylint, pylint-py3k, pylint3')
     parser.add_argument('--mypy-config-file', default=None,
                         dest='mypy_config_file',
                         help='Location of a config file for mypy')
@@ -1204,6 +1290,9 @@ def parse_args():
                         action='store',
                         help=("Whether to fake failing checkers's STDERR as a reported "
                               "error for easier display."))
+    parser.add_argument('--py23-autodetect', type=str2bool, default=False,
+                        action='store',
+                        help='Autodetect python2 and/or python3.')
 
     parser.add_argument('--mypy-no-implicit-optional', type=str2bool, default=False,
                         action='store')
