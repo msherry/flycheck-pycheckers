@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """A hacked up version of the multiple-Python checkers script from EmacsWiki.
 
 Original work taken from http://www.emacswiki.org/emacs/PythonMode, author
