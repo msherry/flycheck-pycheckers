@@ -266,6 +266,9 @@ per-directory."
              (option "--multi-thread" flycheck-pycheckers-multi-thread)
              (option "--venv-root" flycheck-pycheckers-venv-root)
              (option "--report-checker-errors-inline" flycheck-pycheckers-report-errors-inline)
+             (eval (when (and (boundp 'poetry-project-venv)
+                              poetry-project-venv)
+                     (concat "--venv-path" poetry-project-venv)))
              (config-file "--pylint-rcfile" flycheck-pycheckers-pylintrc)
              ;; Need `source-inplace' for relative imports (e.g. `from .foo
              ;; import bar'), see https://github.com/flycheck/flycheck/issues/280
