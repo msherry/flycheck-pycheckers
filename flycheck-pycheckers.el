@@ -283,7 +283,7 @@ per-directory."
     (info line-start
      "INFO " (optional (id (one-or-more (not (any ":"))))) ":"
      (message) " at " (file-name) " line " line (optional "," column) "." line-end))
-  :modes 'python-mode)
+  :modes '(python-mode python-ts-mode))
 
 (defun flycheck-pycheckers-unsetup ()
   "Utility function, used for testing only."
